@@ -11,4 +11,4 @@ RUN cd frontend && corepack enable && corepack prepare pnpm@latest --activate &&
 
 EXPOSE 3000
 
-CMD ["bash", "-c", "cd backend && /opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 & cd frontend && pnpm start -p ${PORT:-3000}"]
+CMD ["bash", "-c", "cd backend && /opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 & cd frontend && pnpm start -p 3000"]
