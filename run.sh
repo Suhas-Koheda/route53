@@ -9,6 +9,7 @@ cd ..
 
 # Install, build & start frontend on Railway's PORT
 cd frontend
+npm install -g pnpm
 pnpm install
 pnpm run build
 pnpm run start -- -p ${PORT:-3000}
