@@ -1,0 +1,96 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function authHeaders() {
+  const user = typeof window !== "undefined" ? localStorage.getItem("user") || "anonymous" : "anonymous";
+  return { "Content-Type": "application/json", "X-User-Id": user };
+}
+
+export async function signup(email: string, password: string) {
+  const res = await fetch(`${API_URL}/auth/signup`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || "Signup failed");
+  return res.json();
+}
+
+export async function loginApi(email: string, password: string) {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || "Login failed");
+  return res.json();
+}
+
+export async function getZones() {
+  const res = await fetch(`${API_URL}/hosted-zones`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function createZone(name: string, comment?: string) {
+  const res = await fetch(`${API_URL}/hosted-zones`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ name, comment }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  }
+  return res.json();
+}
+
+export async function updateZone(id: number, data: { name?: string; comment?: string }) {
+  const res = await fetch(`${API_URL}/hosted-zones/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  }
+  return res.json();
+}
+
+export async function deleteZone(id: number) {
+  await fetch(`${API_URL}/hosted-zones/${id}`, { method: "DELETE", headers: authHeaders() });
+}
+
+export async function getRecords(zoneId: number) {
+  const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/records`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function createRecord(zoneId: number, data: any) {
+  const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/records`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  }
+  return res.json();
+}
+
+export async function updateRecord(id: number, data: any) {
+  const res = await fetch(`${API_URL}/records/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  }
+  return res.json();
+}
+
+export async function deleteRecord(id: number) {
+  await fetch(`${API_URL}/records/${id}`, { method: "DELETE", headers: authHeaders() });
+}
