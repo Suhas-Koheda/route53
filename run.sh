@@ -9,7 +9,7 @@ cd ..
 
 # Install, build & start frontend on Railway's PORT
 cd frontend
-npm install -g pnpm
-pnpm install
-pnpm run build
-pnpm run start -- -p ${PORT:-3000}
+npx -y pnpm@latest install
+npx -y pnpm@latest install
+npx -y pnpm@latest run build
+npx -y pnpm@latest run start -- -p ${PORT:-3000}
