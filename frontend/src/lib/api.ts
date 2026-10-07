@@ -1,106 +1,135 @@
+import type { AuthResponse, DnsRecord, DnsRecordCreateInput, DnsRecordUpdateInput, HostedZone, HostedZoneCreateInput, HostedZoneUpdateInput, ImportResult } from "@/lib/types";
+
 const API_URL = "/api";
 
-function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+function getToken(): string {
+  return typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
 }
 
-export async function signup(email: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/signup`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Signup failed");
+function clearSessionAndRedirect() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  document.cookie = "session=; path=/; max-age=0";
+  // Full reload clears all React state; acceptable for a hard sign-out redirect.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.href = "/login";
+}
+
+interface FastApiError {
+  detail?: string | Array<{ msg?: string } | string>;
+}
+
+async function parseError(res: Response): Promise<Error> {
+  let message = `Request failed (${res.status})`;
+  try {
+    const body: FastApiError = await res.json();
+    if (Array.isArray(body.detail)) {
+      message = body.detail
+        .map((d) => (typeof d === "string" ? d : d && typeof d === "object" && "msg" in d ? String(d.msg) : ""))
+        .filter(Boolean)
+        .join(", ") || message;
+    } else if (typeof body.detail === "string") {
+      message = body.detail;
+    }
+  } catch {
+    /* ignore parse errors */
   }
-  return res.json();
+  return new Error(message);
 }
 
-export async function loginApi(email: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Login failed");
+interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  formData?: FormData;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { method = "GET", body, formData } = options;
+  const headers: Record<string, string> = { Authorization: `Bearer ${getToken()}` };
+  if (body !== undefined && !formData) {
+    headers["Content-Type"] = "application/json";
   }
-  return res.json();
-}
-
-export async function getZones() {
-  const res = await fetch(`${API_URL}/hosted-zones`, { headers: authHeaders() });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
-  return res.json();
-}
-
-export async function createZone(name: string, comment?: string, zoneType?: string) {
-  const res = await fetch(`${API_URL}/hosted-zones`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ name, comment, zone_type: zoneType }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  const init: RequestInit = { method, headers };
+  if (formData) {
+    init.body = formData;
+  } else if (body !== undefined) {
+    init.body = JSON.stringify(body);
   }
-  return res.json();
-}
-
-export async function updateZone(id: number, data: { name?: string; comment?: string; zone_type?: string }) {
-  const res = await fetch(`${API_URL}/hosted-zones/${id}`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  const res = await fetch(`${API_URL}${path}`, init);
+  if (res.status === 401) {
+    clearSessionAndRedirect();
+    throw new Error("Session expired. Redirecting to login.");
   }
-  return res.json();
-}
-
-export async function deleteZone(id: number) {
-  const res = await fetch(`${API_URL}/hosted-zones/${id}`, { method: "DELETE", headers: authHeaders() });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
-}
-
-export async function getRecords(zoneId: number) {
-  const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/records`, { headers: authHeaders() });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
-  return res.json();
-}
-
-export async function createRecord(zoneId: number, data: any) {
-  const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/records`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify(data),
-  });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+    throw await parseError(res);
   }
-  return res.json();
+  return (await res.json()) as T;
 }
 
-export async function updateRecord(id: number, data: any) {
-  const res = await fetch(`${API_URL}/records/${id}`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify(data),
+export async function signup(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/signup", { method: "POST", body: { email, password } });
+}
+
+export async function loginApi(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/login", { method: "POST", body: { email, password } });
+}
+
+export async function getZones(): Promise<HostedZone[]> {
+  return request<HostedZone[]>("/hosted-zones");
+}
+
+export async function getZone(id: number | string): Promise<HostedZone> {
+  return request<HostedZone>(`/hosted-zones/${id}`);
+}
+
+export async function createZone(name: string, comment?: string, zoneType?: string): Promise<HostedZone> {
+  const body: HostedZoneCreateInput = { name };
+  if (comment !== undefined) body.comment = comment;
+  if (zoneType !== undefined) body.zone_type = zoneType;
+  return request<HostedZone>("/hosted-zones", { method: "POST", body });
+}
+
+export async function updateZone(id: number, data: HostedZoneUpdateInput): Promise<HostedZone> {
+  return request<HostedZone>(`/hosted-zones/${id}`, { method: "PUT", body: data });
+}
+
+export async function deleteZone(id: number): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/hosted-zones/${id}`, { method: "DELETE" });
+}
+
+export async function getRecords(zoneId: number): Promise<DnsRecord[]> {
+  return request<DnsRecord[]>(`/hosted-zones/${zoneId}/records`);
+}
+
+export async function createRecord(zoneId: number, data: DnsRecordCreateInput): Promise<DnsRecord> {
+  return request<DnsRecord>(`/hosted-zones/${zoneId}/records`, { method: "POST", body: data });
+}
+
+export async function updateRecord(id: number, data: DnsRecordUpdateInput): Promise<DnsRecord> {
+  return request<DnsRecord>(`/records/${id}`, { method: "PUT", body: data });
+}
+
+export async function deleteRecord(id: number): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/records/${id}`, { method: "DELETE" });
+}
+
+export async function exportZone(zoneId: number, format: "json" | "bind"): Promise<unknown> {
+  const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/export?format=${format}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Failed");
+  if (res.status === 401) {
+    clearSessionAndRedirect();
+    throw new Error("Session expired. Redirecting to login.");
   }
-  return res.json();
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+  return format === "json" ? res.json() : res.text();
 }
 
-export async function deleteRecord(id: number) {
-  const res = await fetch(`${API_URL}/records/${id}`, { method: "DELETE", headers: authHeaders() });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
+export async function importZone(zoneId: number, file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<ImportResult>(`/hosted-zones/${zoneId}/import`, { method: "POST", formData });
 }

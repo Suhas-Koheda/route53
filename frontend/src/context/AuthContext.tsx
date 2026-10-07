@@ -1,19 +1,26 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { loginApi } from "@/lib/api";
+import { loginApi, signup as signupApi } from "@/lib/api";
 
 interface AuthContextType {
   user: string | null;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void> | void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => {},
+  signup: async () => {},
   logout: () => {},
 });
+
+function sessionCookie(token: string, maxAge: number) {
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `session=${token}; path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string | null>(null);
@@ -23,22 +30,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("user");
     const tok = localStorage.getItem("token");
     if (saved && tok) {
+      // Hydration-restore from localStorage; suppress the new set-state-in-effect rule.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(saved);
-      document.cookie = `session=${tok}; path=/; max-age=86400`;
+      sessionCookie(tok, 604800);
     }
   }, []);
 
+  const persist = (email: string, token: string) => {
+    localStorage.setItem("user", email);
+    localStorage.setItem("token", token);
+    sessionCookie(token, 604800);
+    setUser(email);
+  };
+
   const login = async (email: string, password: string) => {
     const res = await loginApi(email, password);
-    localStorage.setItem("user", res.email);
-    localStorage.setItem("token", res.token);
-    document.cookie = `session=${res.token}; path=/; max-age=86400`;
-    setUser(res.email);
+    persist(res.email, res.token);
+    router.push("/hosted-zones");
+  };
+
+  const signup = async (email: string, password: string) => {
+    const res = await signupApi(email, password);
+    persist(res.email, res.token);
     router.push("/hosted-zones");
   };
 
   const logout = async () => {
-    try { await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }); } catch {}
+    try {
+      await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     document.cookie = "session=; path=/; max-age=0";
@@ -47,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

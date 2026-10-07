@@ -7,6 +7,6 @@ export default function Home() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     router.replace(token ? "/hosted-zones" : "/login");
-  }, []);
+  }, [router]);
   return null;
 }

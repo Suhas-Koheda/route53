@@ -13,33 +13,44 @@ import Modal from "@cloudscape-design/components/modal";
 import FormField from "@cloudscape-design/components/form-field";
 import Input from "@cloudscape-design/components/input";
 import Flashbar from "@cloudscape-design/components/flashbar";
+import Select from "@cloudscape-design/components/select";
+import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getZones, createZone, updateZone, deleteZone } from "@/lib/api";
+import type { HostedZone, HostedZoneCreateInput } from "@/lib/types";
 
 export default function HostedZonesPage() {
-  const [zones, setZones] = useState<any[] | null>(null);
-  const [filter, setFilter] = useState("");
+  const [zones, setZones] = useState<HostedZone[] | null>(null);
   const [modalError, setModalError] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<HostedZone | null>(null);
   const [name, setName] = useState("");
   const [comment, setComment] = useState("");
-  const [zoneType, setZoneType] = useState("public");
-  const [flashes, setFlashes] = useState<any[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [zoneType, setZoneType] = useState<{ label: string; value: string }>({ label: "Public", value: "public" });
+  const [flashes, setFlashes] = useState<Array<object>>([]);
   const router = useRouter();
 
+  const flash = (type: "success" | "error" | "info", content: string) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setFlashes((prev) => [...prev, { type, content, dismissible: true, onDismiss: () => setFlashes((p) => p.filter((f) => (f as { id?: string }).id !== id)) }]);
+    setTimeout(() => setFlashes((p) => p.filter((f) => (f as { id?: string }).id !== id)), 4000);
+  };
+
   const load = () => getZones().then(setZones).catch(() => { setZones([]); flash("error", "Unable to load hosted zones"); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
-  const filtered = (zones || []).filter((z) => z.name.toLowerCase().includes(filter.toLowerCase()));
-  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const flash = (type: string, content: string) => {
-    const id = Date.now().toString();
-    setFlashes([{ type, content, dismissible: true, onDismiss: () => setFlashes([]) }]);
-    setTimeout(() => setFlashes([]), 3000);
-  };
+  const { items, filterProps, paginationProps, collectionProps, filteredItemsCount } = useCollection<HostedZone>(zones || [], {
+    filtering: {
+      filteringFunction: (item, filteringText) =>
+        item.name.toLowerCase().includes(filteringText.toLowerCase()) ||
+        (item.comment || "").toLowerCase().includes(filteringText.toLowerCase()),
+      empty: <Box textAlign="center" color="inherit" padding={{ vertical: "l" }}>No hosted zones</Box>,
+      noMatch: <Box textAlign="center" color="inherit" padding={{ vertical: "l" }}>No matches found</Box>,
+    },
+    sorting: { defaultState: { sortingColumn: { sortingField: "name" }, isDescending: false } },
+    pagination: { pageSize: 10 },
+    selection: { trackBy: "id" },
+  });
 
   const handleSave = async () => {
     try {
@@ -47,18 +58,19 @@ export default function HostedZonesPage() {
         await updateZone(editing.id, { comment });
         flash("success", "Hosted zone updated");
       } else {
-        await createZone(name, comment, zoneType);
+        const payload: HostedZoneCreateInput = { name, comment, zone_type: zoneType.value };
+        await createZone(payload.name, payload.comment, payload.zone_type);
         flash("success", "Hosted zone created");
       }
       setShowModal(false);
       setEditing(null);
       setName("");
       setComment("");
-      setZoneType("public");
+      setZoneType({ label: "Public", value: "public" });
       setModalError("");
       load();
-    } catch (e: any) {
-      setModalError(e.message);
+    } catch (e) {
+      setModalError(e instanceof Error ? e.message : "Failed");
     }
   };
 
@@ -70,18 +82,18 @@ export default function HostedZonesPage() {
         await deleteZone(deleteId);
         flash("success", "Hosted zone deleted");
         load();
-      } catch (e: any) {
-        flash("error", e.message);
+      } catch (e) {
+        flash("error", e instanceof Error ? e.message : "Failed");
       }
       setDeleteId(null);
     }
   };
 
-  const openEdit = (zone: any) => {
+  const openEdit = (zone: HostedZone) => {
     setEditing(zone);
     setName(zone.name);
     setComment(zone.comment || "");
-    setZoneType(zone.zone_type || "public");
+    setZoneType(zone.zone_type === "private" ? { label: "Private", value: "private" } : { label: "Public", value: "public" });
     setModalError("");
     setShowModal(true);
   };
@@ -90,36 +102,30 @@ export default function HostedZonesPage() {
     <>
       <Flashbar items={flashes} />
       <Table
+        {...collectionProps}
         columnDefinitions={[
-          {
-            id: "name",
-            header: "Name",
-            cell: (item: any) => (
-              <Link onFollow={(e) => { e.preventDefault(); router.push(`/hosted-zones/${item.id}`); }}>{item.name}</Link>
-            ),
-          },
-          { id: "comment", header: "Comment", cell: (item: any) => item.comment || "—" },
-          { id: "zone_type", header: "Type", cell: (item: any) => item.zone_type === "private" ? "Private" : "Public" },
-          { id: "record_count", header: "Records", cell: (item: any) => item.record_count ?? "—" },
-          {
-            id: "actions",
-            header: "Actions",
-            cell: (item: any) => (
-              <SpaceBetween direction="horizontal" size="xs">
-                <Link key="edit" onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
-                <Link key="delete" onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
-              </SpaceBetween>
-            ),
-          },
+          { id: "name", header: "Name", sortingField: "name", cell: (item: HostedZone) => (
+            <Link onFollow={(e) => { e.preventDefault(); router.push(`/hosted-zones/${item.id}`); }}>{item.name}</Link>
+          ) },
+          { id: "comment", header: "Comment", cell: (item: HostedZone) => item.comment || "—" },
+          { id: "zone_type", header: "Type", sortingField: "zone_type", cell: (item: HostedZone) => item.zone_type === "private" ? "Private" : "Public" },
+          { id: "record_count", header: "Records", sortingField: "record_count", cell: (item: HostedZone) => item.record_count ?? "—" },
+          { id: "actions", header: "Actions", cell: (item: HostedZone) => (
+            <SpaceBetween direction="horizontal" size="xs">
+              <Link key="edit" onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
+              <Link key="delete" onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
+            </SpaceBetween>
+          ) },
         ]}
-        items={paginated}
+        items={items}
         variant="container"
-        pagination={<Pagination currentPageIndex={currentPage} onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)} pagesCount={Math.ceil(filtered.length / pageSize) || 1} />}
+        selectionType="single"
+        pagination={<Pagination {...paginationProps} />}
         header={
           <Header
-            counter={`(${filtered.length})`}
+            counter={`(${filteredItemsCount ?? 0})`}
             actions={
-              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setComment(""); setZoneType("public"); setModalError(""); setShowModal(true); }}>
+              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setComment(""); setZoneType({ label: "Public", value: "public" }); setModalError(""); setShowModal(true); }}>
                 Create hosted zone
               </Button>
             }
@@ -127,8 +133,8 @@ export default function HostedZonesPage() {
             Hosted zones
           </Header>
         }
-        filter={<TextFilter filteringText={filter} onChange={({ detail }) => setFilter(detail.filteringText)} />}
-        empty={zones === null ? "Loading hosted zones..." : "No hosted zones. Create one to get started."}
+        filter={<TextFilter {...filterProps} filteringPlaceholder="Find hosted zones" />}
+        empty={zones === null ? "Loading hosted zones..." : collectionProps.empty}
       />
 
       <Modal
@@ -145,11 +151,7 @@ export default function HostedZonesPage() {
         }
       >
         <SpaceBetween size="l">
-          {modalError && (
-            <div key="modal-error" style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13 }}>
-              {modalError}
-            </div>
-          )}
+          {modalError && <Box color="text-status-error">{modalError}</Box>}
           <FormField key="name" label="Domain name" description={editing ? "Cannot be renamed" : undefined}>
             <Input value={name} disabled={!!editing} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
           </FormField>
@@ -157,10 +159,12 @@ export default function HostedZonesPage() {
             <Input value={comment} onChange={({ detail }) => setComment(detail.value)} />
           </FormField>
           <FormField key="type" label="Type" description={editing ? "Cannot be changed" : undefined}>
-            <select value={zoneType} disabled={!!editing} onChange={(e) => setZoneType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
-              <option value="public">Public hosted zone</option>
-              <option value="private">Private hosted zone</option>
-            </select>
+            <Select
+              selectedOption={zoneType}
+              onChange={({ detail }) => setZoneType(detail.selectedOption as { label: string; value: string })}
+              options={[{ label: "Public", value: "public" }, { label: "Private", value: "private" }]}
+              disabled={!!editing}
+            />
           </FormField>
         </SpaceBetween>
       </Modal>

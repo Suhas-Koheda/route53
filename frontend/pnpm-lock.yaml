@@ -169,6 +169,9 @@ importers:
       '@cloudscape-design/board-components':
         specifier: ^3.0.236
         version: 3.0.236(@cloudscape-design/components@3.0.1392(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@cloudscape-design/collection-hooks':
+        specifier: ^1.0.110
+        version: 1.0.110(react@19.2.8)
       '@cloudscape-design/components':
         specifier: ^3.0.1392
         version: 3.0.1392(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

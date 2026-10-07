@@ -20,10 +20,11 @@ export default function LoginPage() {
     setError("");
     try {
       await login(email, password);
-    } catch (err: any) {
-      setError(err.message === "Invalid credentials"
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      setError(msg === "Invalid credentials"
         ? "The email or password is incorrect. Try again."
-        : err.message);
+        : msg);
     }
   };
 

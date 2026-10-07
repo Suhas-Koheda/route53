@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@cloudscape-design/board-components": "^3.0.236",
+    "@cloudscape-design/collection-hooks": "^1.0.110",
     "@cloudscape-design/components": "^3.0.1392",
     "@cloudscape-design/global-styles": "^1.0.71",
     "next": "16.3.8",

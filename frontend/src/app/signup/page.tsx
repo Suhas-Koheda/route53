@@ -1,12 +1,11 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { signup, loginApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const router = useRouter();
+  const { signup } = useAuth();
 
   const [error, setError] = useState("");
 
@@ -18,13 +17,9 @@ export default function SignupPage() {
       return;
     }
     try {
-      const res = await signup(email, password);
-      localStorage.setItem("user", res.email);
-      localStorage.setItem("token", res.token);
-      document.cookie = `session=${res.token}; path=/; max-age=86400`;
-      router.push("/hosted-zones");
-    } catch (e: any) {
-      setError(e.message);
+      await signup(email, password);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Signup failed");
     }
   };
 

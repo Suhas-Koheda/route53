@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/"];
-
 export function proxy(request: NextRequest) {
   const session = request.cookies.get("session");
   const { pathname } = request.nextUrl;
