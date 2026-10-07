@@ -1,11 +1,18 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import FormField from "@cloudscape-design/components/form-field";
+import Input from "@cloudscape-design/components/input";
+import Button from "@cloudscape-design/components/button";
+import Box from "@cloudscape-design/components/box";
+import Link from "@cloudscape-design/components/link";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { signup } = useAuth();
+  const router = useRouter();
 
   const [error, setError] = useState("");
 
@@ -24,51 +31,48 @@ export default function SignupPage() {
   };
 
   return (
-    <div style={{ backgroundColor: "#0f1b2a", minHeight: "100vh" }}>
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #2a3644" }}>
-        <a href="/login" style={{ textDecoration: "none" }}>
-          <span style={{ color: "#ff9900", fontSize: 24, fontWeight: "bold" }}>aws</span>
-        </a>
+    <div style={{ backgroundColor: "#f2f3f3", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "14px 24px", borderBottom: "1px solid #d5dbdb", backgroundColor: "#fff" }}>
+        <Link href="/login" onFollow={(e) => { e.preventDefault(); router.push("/login"); }}>
+          <span style={{ color: "#ff9900", fontSize: 22, fontWeight: "bold" }}>aws</span>
+        </Link>
       </div>
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
-        <div style={{ backgroundColor: "#fff", borderRadius: 8, padding: 40, width: 440 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24 }}>Create an AWS account</h1>
+
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", paddingTop: 48 }}>
+        <div style={{ backgroundColor: "#fff", borderRadius: 8, padding: "32px 36px", width: 420, boxShadow: "0 1px 4px rgba(0,0,0,0.12)", border: "1px solid #d5dbdb" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 20 }}>Create an AWS account</h1>
           <form onSubmit={handleSignup}>
-            <label style={{ display: "block", fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #aab7b8", borderRadius: 4, fontSize: 14, boxSizing: "border-box" }}
-              required
-            />
-            <label style={{ display: "block", fontSize: 14, fontWeight: 600, margin: "16px 0 6px" }}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #aab7b8", borderRadius: 4, fontSize: 14, boxSizing: "border-box" }}
-              required
-            />
-            <p style={{ fontSize: 12, color: "#687078", marginTop: 6 }}>
-              Min 8 chars, at least one lowercase, uppercase, number, and special character (e.g. P@ssw0rd!).
-            </p>
-            {error && (
-              <div style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13, marginTop: 16 }}>
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              style={{ marginTop: 24, width: "100%", backgroundColor: "#ec7211", color: "#fff", border: "none", borderRadius: 4, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-            >
-              Create account
-            </button>
+            <FormField label="Email">
+              <Input
+                type="email"
+                value={email}
+                onChange={({ detail }) => setEmail(detail.value)}
+                placeholder="you@example.com"
+              />
+            </FormField>
+            <FormField label="Password" description="Min 8 chars, at least one lowercase, uppercase, number, and special character (e.g. P@ssw0rd!).">
+              <Input
+                type="password"
+                value={password}
+                onChange={({ detail }) => setPassword(detail.value)}
+              />
+            </FormField>
+            {error && <Box color="text-status-error" margin={{ vertical: "s" }}>{error}</Box>}
+            <div style={{ marginTop: 20 }}>
+              <Button formAction="submit" variant="primary">
+                Create account
+              </Button>
+            </div>
           </form>
           <p style={{ marginTop: 20, fontSize: 13 }}>
-            Already have an account? <a href="/login" style={{ color: "#0972d3" }}>Sign in</a>
+            Already have an account? <Link href="/login" onFollow={(e) => { e.preventDefault(); router.push("/login"); }}>Sign in</Link>
           </p>
         </div>
+      </div>
+
+      <div style={{ padding: "16px 24px", borderTop: "1px solid #d5dbdb", backgroundColor: "#fff", textAlign: "center" }}>
+        <Link href="#" onFollow={(e) => e.preventDefault()}>Privacy</Link>
+        <Link href="#" onFollow={(e) => e.preventDefault()}>Terms of use</Link>
       </div>
     </div>
   );

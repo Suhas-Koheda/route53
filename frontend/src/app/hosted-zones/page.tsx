@@ -1,188 +1,179 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Table from "@cloudscape-design/components/table";
 import Button from "@cloudscape-design/components/button";
 import Header from "@cloudscape-design/components/header";
 import Box from "@cloudscape-design/components/box";
-import Pagination from "@cloudscape-design/components/pagination";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Link from "@cloudscape-design/components/link";
 import TextFilter from "@cloudscape-design/components/text-filter";
 import Modal from "@cloudscape-design/components/modal";
 import FormField from "@cloudscape-design/components/form-field";
 import Input from "@cloudscape-design/components/input";
-import Flashbar from "@cloudscape-design/components/flashbar";
-import Select from "@cloudscape-design/components/select";
+import Pagination from "@cloudscape-design/components/pagination";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getZones, createZone, updateZone, deleteZone } from "@/lib/api";
-import type { HostedZone, HostedZoneCreateInput } from "@/lib/types";
+import { getZones, updateZone, deleteZone } from "@/lib/api";
+import { useFlashbar } from "@/components/FlashbarProvider";
+import type { HostedZone } from "@/lib/types";
 
 export default function HostedZonesPage() {
   const [zones, setZones] = useState<HostedZone[] | null>(null);
-  const [modalError, setModalError] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<HostedZone | null>(null);
-  const [name, setName] = useState("");
-  const [comment, setComment] = useState("");
-  const [zoneType, setZoneType] = useState<{ label: string; value: string }>({ label: "Public", value: "public" });
-  const [flashes, setFlashes] = useState<Array<object>>([]);
+  const { flash } = useFlashbar();
   const router = useRouter();
 
-  const flash = (type: "success" | "error" | "info", content: string) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setFlashes((prev) => [...prev, { type, content, dismissible: true, onDismiss: () => setFlashes((p) => p.filter((f) => (f as { id?: string }).id !== id)) }]);
-    setTimeout(() => setFlashes((p) => p.filter((f) => (f as { id?: string }).id !== id)), 4000);
-  };
+  const load = useCallback(() => getZones().then(setZones).catch(() => { setZones([]); flash("error", "Unable to load hosted zones"); }), [flash]);
+  useEffect(() => { load(); }, [load]);
 
-  const load = () => getZones().then(setZones).catch(() => { setZones([]); flash("error", "Unable to load hosted zones"); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
-
-  const { items, filterProps, paginationProps, collectionProps, filteredItemsCount } = useCollection<HostedZone>(zones || [], {
+  const { items, filterProps, paginationProps, collectionProps, filteredItemsCount, actions } = useCollection<HostedZone>(zones || [], {
     filtering: {
       filteringFunction: (item, filteringText) =>
         item.name.toLowerCase().includes(filteringText.toLowerCase()) ||
         (item.comment || "").toLowerCase().includes(filteringText.toLowerCase()),
-      empty: <Box textAlign="center" color="inherit" padding={{ vertical: "l" }}>No hosted zones</Box>,
-      noMatch: <Box textAlign="center" color="inherit" padding={{ vertical: "l" }}>No matches found</Box>,
+      empty: (
+        <Box textAlign="center" color="text-status-inactive" padding={{ vertical: "xl" }}>
+          <SpaceBetween size="s" direction="vertical" alignItems="center">
+            <Header variant="h2">No hosted zones</Header>
+            <Box fontWeight="normal">You don&apos;t have any hosted zones. Create one to get started.</Box>
+            <Button variant="primary" onClick={() => router.push("/hosted-zones/create")}>Create hosted zone</Button>
+          </SpaceBetween>
+        </Box>
+      ),
+      noMatch: (
+        <Box textAlign="center" color="text-status-inactive" padding={{ vertical: "xl" }}>
+          <SpaceBetween size="s" direction="vertical" alignItems="center">
+            <Header variant="h2">No results</Header>
+            <Box fontWeight="normal">No hosted zones match the current filter.</Box>
+          </SpaceBetween>
+        </Box>
+      ),
     },
     sorting: { defaultState: { sortingColumn: { sortingField: "name" }, isDescending: false } },
     pagination: { pageSize: 10 },
     selection: { trackBy: "id" },
   });
 
-  const handleSave = async () => {
+  const selected = collectionProps.selectedItems || [];
+  const selectedZone = selected.length === 1 ? selected[0] : null;
+
+  const [editing, setEditing] = useState<HostedZone | null>(null);
+  const [editComment, setEditComment] = useState("");
+  const [editError, setEditError] = useState("");
+
+  const openEdit = () => {
+    if (!selectedZone) return;
+    setEditing(selectedZone);
+    setEditComment(selectedZone.comment || "");
+    setEditError("");
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
     try {
-      if (editing) {
-        await updateZone(editing.id, { comment });
-        flash("success", "Hosted zone updated");
-      } else {
-        const payload: HostedZoneCreateInput = { name, comment, zone_type: zoneType.value };
-        await createZone(payload.name, payload.comment, payload.zone_type);
-        flash("success", "Hosted zone created");
-      }
-      setShowModal(false);
+      await updateZone(editing.id, { comment: editComment });
+      flash("success", "Hosted zone updated");
       setEditing(null);
-      setName("");
-      setComment("");
-      setZoneType({ label: "Public", value: "public" });
-      setModalError("");
       load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : "Failed");
+      setEditError(e instanceof Error ? e.message : "Failed");
     }
   };
 
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-
+  const [deleteTarget, setDeleteTarget] = useState<HostedZone | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const handleDelete = async () => {
-    if (deleteId != null) {
-      try {
-        await deleteZone(deleteId);
-        flash("success", "Hosted zone deleted");
-        load();
-      } catch (e) {
-        flash("error", e instanceof Error ? e.message : "Failed");
-      }
-      setDeleteId(null);
+    if (!deleteTarget) return;
+    try {
+      await deleteZone(deleteTarget.id);
+      flash("success", "Hosted zone deleted");
+      setDeleteTarget(null);
+      setDeleteConfirm("");
+      actions.setSelectedItems([]);
+      load();
+    } catch (e) {
+      flash("error", e instanceof Error ? e.message : "Failed");
     }
-  };
-
-  const openEdit = (zone: HostedZone) => {
-    setEditing(zone);
-    setName(zone.name);
-    setComment(zone.comment || "");
-    setZoneType(zone.zone_type === "private" ? { label: "Private", value: "private" } : { label: "Public", value: "public" });
-    setModalError("");
-    setShowModal(true);
   };
 
   return (
     <>
-      <Flashbar items={flashes} />
       <Table
         {...collectionProps}
         columnDefinitions={[
-          { id: "name", header: "Name", sortingField: "name", cell: (item: HostedZone) => (
-            <Link onFollow={(e) => { e.preventDefault(); router.push(`/hosted-zones/${item.id}`); }}>{item.name}</Link>
-          ) },
-          { id: "comment", header: "Comment", cell: (item: HostedZone) => item.comment || "—" },
-          { id: "zone_type", header: "Type", sortingField: "zone_type", cell: (item: HostedZone) => item.zone_type === "private" ? "Private" : "Public" },
-          { id: "record_count", header: "Records", sortingField: "record_count", cell: (item: HostedZone) => item.record_count ?? "—" },
-          { id: "actions", header: "Actions", cell: (item: HostedZone) => (
-            <SpaceBetween direction="horizontal" size="xs">
-              <Link key="edit" onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
-              <Link key="delete" onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
-            </SpaceBetween>
-          ) },
+          {
+            id: "name",
+            header: "Hosted zone name",
+            sortingField: "name",
+            cell: (item: HostedZone) => (
+              <Link onFollow={(e) => { e.preventDefault(); router.push(`/hosted-zones/${item.id}`); }}>{item.name}</Link>
+            ),
+          },
+          { id: "zone_type", header: "Type", sortingField: "zone_type", cell: (item: HostedZone) => (item.zone_type === "private" ? "Private hosted zone" : "Public hosted zone") },
+          { id: "created_by", header: "Created by", sortingField: "created_by", cell: (item: HostedZone) => item.created_by || "—" },
+          { id: "record_count", header: "Record count", sortingField: "record_count", cell: (item: HostedZone) => item.record_count ?? "—" },
+          { id: "comment", header: "Description", cell: (item: HostedZone) => item.comment || "—" },
+          { id: "zone_id_str", header: "Hosted zone ID", cell: (item: HostedZone) => item.zone_id_str || "—" },
         ]}
         items={items}
         variant="container"
         selectionType="single"
-        pagination={<Pagination {...paginationProps} />}
+        trackBy="id"
+        pagination={paginationProps && <Pagination {...paginationProps} />}
         header={
           <Header
             counter={`(${filteredItemsCount ?? 0})`}
             actions={
-              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setComment(""); setZoneType({ label: "Public", value: "public" }); setModalError(""); setShowModal(true); }}>
-                Create hosted zone
-              </Button>
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button disabled={!selectedZone} onClick={() => selectedZone && router.push(`/hosted-zones/${selectedZone.id}`)}>View details</Button>
+                <Button disabled={!selectedZone} onClick={openEdit}>Edit</Button>
+                <Button disabled={!selectedZone} onClick={() => selectedZone && setDeleteTarget(selectedZone)}>Delete</Button>
+                <Button variant="primary" onClick={() => router.push("/hosted-zones/create")}>Create hosted zone</Button>
+              </SpaceBetween>
             }
           >
             Hosted zones
           </Header>
         }
-        filter={<TextFilter {...filterProps} filteringPlaceholder="Find hosted zones" />}
+        filter={
+          <TextFilter
+            {...filterProps}
+            filteringPlaceholder="Find hosted zones"
+            countText={`${filteredItemsCount ?? 0} match${filteredItemsCount === 1 ? "" : "es"}`}
+          />
+        }
         empty={zones === null ? "Loading hosted zones..." : collectionProps.empty}
       />
 
-      <Modal
-        visible={showModal}
-        onDismiss={() => setShowModal(false)}
-        header={editing ? "Edit hosted zone" : "Create hosted zone"}
-        footer={
-          <Box float="right">
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button key="cancel" variant="link" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button key="save" variant="primary" onClick={handleSave}>{editing ? "Save" : "Create"}</Button>
-            </SpaceBetween>
-          </Box>
-        }
-      >
+      <Modal visible={!!editing} onDismiss={() => setEditing(null)} header="Edit hosted zone" footer={
+        <Box float="right">
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button variant="link" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button variant="primary" onClick={saveEdit}>Save</Button>
+          </SpaceBetween>
+        </Box>
+      }>
         <SpaceBetween size="l">
-          {modalError && <Box color="text-status-error">{modalError}</Box>}
-          <FormField key="name" label="Domain name" description={editing ? "Cannot be renamed" : undefined}>
-            <Input value={name} disabled={!!editing} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
-          </FormField>
-          <FormField key="comment" label="Comment (optional)">
-            <Input value={comment} onChange={({ detail }) => setComment(detail.value)} />
-          </FormField>
-          <FormField key="type" label="Type" description={editing ? "Cannot be changed" : undefined}>
-            <Select
-              selectedOption={zoneType}
-              onChange={({ detail }) => setZoneType(detail.selectedOption as { label: string; value: string })}
-              options={[{ label: "Public", value: "public" }, { label: "Private", value: "private" }]}
-              disabled={!!editing}
-            />
+          {editError && <Box color="text-status-error">{editError}</Box>}
+          <FormField label="Description">
+            <Input value={editComment} onChange={({ detail }) => setEditComment(detail.value)} />
           </FormField>
         </SpaceBetween>
       </Modal>
 
-      <Modal
-        visible={deleteId !== null}
-        onDismiss={() => setDeleteId(null)}
-        header="Delete hosted zone?"
-        footer={
-          <Box float="right">
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button key="cancel" variant="link" onClick={() => setDeleteId(null)}>Cancel</Button>
-              <Button key="delete" variant="primary" onClick={handleDelete}>Delete</Button>
-            </SpaceBetween>
-          </Box>
-        }
-      >
-        Are you sure you want to delete this hosted zone and all its records? This action cannot be undone.
+      <Modal visible={!!deleteTarget} onDismiss={() => setDeleteTarget(null)} header="Delete hosted zone" footer={
+        <Box float="right">
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button variant="link" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="primary" disabled={deleteConfirm !== "delete"} onClick={handleDelete}>Delete</Button>
+          </SpaceBetween>
+        </Box>
+      }>
+        <SpaceBetween size="l">
+          <Box>To confirm deletion, type <b>delete</b> below.</Box>
+          <FormField label="Confirmation">
+            <Input value={deleteConfirm} onChange={({ detail }) => setDeleteConfirm(detail.value)} placeholder="delete" />
+          </FormField>
+        </SpaceBetween>
       </Modal>
     </>
   );

@@ -1,19 +1,28 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import RadioGroup from "@cloudscape-design/components/radio-group";
+import FormField from "@cloudscape-design/components/form-field";
+import Input from "@cloudscape-design/components/input";
+import Button from "@cloudscape-design/components/button";
+import Box from "@cloudscape-design/components/box";
+import SpaceBetween from "@cloudscape-design/components/space-between";
+import Link from "@cloudscape-design/components/link";
 
 export default function LoginPage() {
   const [step, setStep] = useState<"email" | "password">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [userType, setUserType] = useState("root");
+  const [error, setError] = useState("");
   const { login } = useAuth();
+  const router = useRouter();
 
   const handleEmailNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) setStep("password");
   };
-
-  const [error, setError] = useState("");
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,72 +38,82 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ backgroundColor: "#0f1b2a", minHeight: "100vh" }}>
-      {/* AWS header */}
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #2a3644" }}>
-        <span style={{ color: "#ff9900", fontSize: 24, fontWeight: "bold" }}>aws</span>
+    <div style={{ backgroundColor: "#f2f3f3", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "14px 24px", borderBottom: "1px solid #d5dbdb", backgroundColor: "#fff" }}>
+        <span style={{ color: "#ff9900", fontSize: 22, fontWeight: "bold" }}>aws</span>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
-        <div style={{ backgroundColor: "#fff", borderRadius: 8, padding: 40, width: 440, boxShadow: "0 2px 24px rgba(0,0,0,0.3)" }}>
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", paddingTop: 48 }}>
+        <div style={{ backgroundColor: "#fff", borderRadius: 8, padding: "32px 36px", width: 420, boxShadow: "0 1px 4px rgba(0,0,0,0.12)", border: "1px solid #d5dbdb" }}>
           {step === "email" ? (
             <>
-              <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24 }}>Sign in</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 20 }}>Sign in</h1>
               <form onSubmit={handleEmailNext}>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Email or account ID</label>
-                <input
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #aab7b8", borderRadius: 4, fontSize: 14, boxSizing: "border-box" }}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  style={{ marginTop: 24, width: "100%", backgroundColor: "#ec7211", color: "#fff", border: "none", borderRadius: 4, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-                >
-                  Next
-                </button>
+                <FormField label="Root user or IAM user">
+                  <RadioGroup
+                    value={userType}
+                    onChange={({ detail }) => setUserType(detail.value)}
+                    items={[
+                      { value: "root", label: "Root user", description: "Account owner with full access." },
+                      { value: "iam", label: "IAM user", description: "User with assigned permissions." },
+                    ]}
+                  />
+                </FormField>
+                <FormField label="Email or account ID" description="The email address or account ID you used to sign up.">
+                  <Input
+                    type="text"
+                    value={email}
+                    onChange={({ detail }) => setEmail(detail.value)}
+                    placeholder="you@example.com"
+                    autoFocus
+                  />
+                </FormField>
+                <div style={{ marginTop: 20 }}>
+                  <Button formAction="submit" variant="primary">
+                    Next
+                  </Button>
+                </div>
               </form>
               <p style={{ marginTop: 20, fontSize: 13, color: "#545b64" }}>
-                New to AWS? <a href="/signup" style={{ color: "#0972d3" }}>Create an AWS account</a>
+                New to AWS? <Link href="/signup" onFollow={(e) => { e.preventDefault(); router.push("/signup"); }}>Create an AWS account</Link>
               </p>
             </>
           ) : (
             <>
               <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Welcome back</h1>
-              <p style={{ fontSize: 14, color: "#545b64", marginBottom: 24 }}>{email}</p>
-              {error && (
-                <div style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13, marginBottom: 16 }}>
-                  {error}
-                </div>
-              )}
+              <p style={{ fontSize: 14, color: "#545b64", marginBottom: 20 }}>{email}</p>
+              {error && <Box color="text-status-error" margin={{ bottom: "m" }}>{error}</Box>}
               <form onSubmit={handleSignIn}>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #aab7b8", borderRadius: 4, fontSize: 14, boxSizing: "border-box" }}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  style={{ marginTop: 24, width: "100%", backgroundColor: "#ec7211", color: "#fff", border: "none", borderRadius: 4, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-                >
-                  Sign in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep("email")}
-                  style={{ marginTop: 12, width: "100%", background: "none", border: "none", color: "#0972d3", fontSize: 14, cursor: "pointer" }}
-                >
-                  ← Back
-                </button>
+                <FormField label="Password">
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={({ detail }) => setPassword(detail.value)}
+                    autoFocus
+                  />
+                </FormField>
+                <div style={{ marginTop: 20 }}>
+                  <Button formAction="submit" variant="primary">
+                    Sign in
+                  </Button>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <Button variant="link" onClick={() => setStep("email")}>
+                    Back
+                  </Button>
+                </div>
               </form>
             </>
           )}
         </div>
+      </div>
+
+      <div style={{ padding: "16px 24px", borderTop: "1px solid #d5dbdb", backgroundColor: "#fff", textAlign: "center" }}>
+        <SpaceBetween direction="horizontal" size="xs">
+          <Link href="#" onFollow={(e) => e.preventDefault()}>Privacy</Link>
+          <Link href="#" onFollow={(e) => e.preventDefault()}>Terms of use</Link>
+          <Link href="#" onFollow={(e) => e.preventDefault()}>Cookie preferences</Link>
+        </SpaceBetween>
       </div>
     </div>
   );
