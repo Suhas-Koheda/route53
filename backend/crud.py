@@ -61,7 +61,7 @@ def create_zone(db: Session, zone: schemas.HostedZoneCreate, user_id: str):
     idx = int(hashlib.md5(zone.name.encode()).hexdigest(), 16) % 3
     ns_list = ns_sets[idx]
     for ns in ns_list:
-        db.add(models.Record(zone_id=db_zone.id, name=db_zone.name, type="NS", value=ns, ttl=172800, set_identifier=""))
+        db.add(models.Record(zone_id=db_zone.id, name=db_zone.name, type="NS", value=ns, ttl=172800, set_identifier=ns))
     soa = f"{ns_list[0]} awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
     db.add(models.Record(zone_id=db_zone.id, name=db_zone.name, type="SOA", value=soa, ttl=900, set_identifier=""))
     db.commit()

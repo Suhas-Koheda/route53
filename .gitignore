@@ -11,6 +11,8 @@ frontend/out/
 frontend/.vercel
 
 # Environment
+.env*
+!.env.example
 .env
 .env.local
 .env*.local

@@ -18,3 +18,14 @@ What I tested and how:
 Known risks:
 - Flashbar items typed as Array<object> in pages to satisfy Cloudscape's Flashbar prop variance; will be tightened in Phase 3.
 - The `delete` api no longer logs errors (treated as ok); accept.
+
+## Current pass (2026-10-07)
+
+User direction for this pass: do not add or run tests, do not add startup migrations, and keep the existing deployment files unchanged. The prior ignored `backend/route53.db` was removed and recreated from the current SQLAlchemy schema. The historical migration notes above describe the earlier implementation; they do not describe the current startup behavior.
+
+- **Backend/schema:** record unique constraint and zone index are part of the fresh schema; missing identifiers normalize to empty strings in CRUD. Startup now only calls `create_all`; it does not migrate an existing DB. Added `backend/seed.py` and `backend/.env.example`.
+- **Frontend:** removed personal `allowedDevOrigins`, fixed search focus to target the Cloudscape input, moved dark-mode control into the top navigation, loaded zone names in breadcrumbs, added client-side routing-field errors, and switched BIND import to Cloudscape FileUpload.
+- **Docs/repo:** added `frontend/.env.example`, refreshed README with API/schema/architecture/setup/DB reset/deployment notes, and updated assumptions. Existing Dockerfile and run.sh were left untouched.
+- **Run state:** backend `uvicorn` is running on port 8000; the existing Next dev server is running on port 3000. Seed data is present for `demo@example.com` / `Demo@12345`.
+- **Verification this pass:** `pnpm run build` and `pnpm run lint` pass. The existing pytest suite had passed 25 tests earlier in this conversation, before the user asked not to run tests; it was not rerun after the latest database reset and edits. A seed attempt initially exposed an underscore-name validation mismatch; the sample owner name was changed to a supported name and seed then completed.
+- **Known limitation:** no hosted demo link is available; the README contains a placeholder. The DB reset discarded the prior ignored local DB contents, as authorized.

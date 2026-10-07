@@ -19,7 +19,10 @@ class HostedZone(Base):
 
 class Record(Base):
     __tablename__ = "records"
-    __table_args__ = (Index("ix_records_zone_id", "zone_id"),)
+    __table_args__ = (
+        UniqueConstraint("zone_id", "name", "type", "set_identifier", name="uq_records_zone_name_type_set_identifier"),
+        Index("ix_records_zone_id", "zone_id"),
+    )
     id = Column(Integer, primary_key=True, index=True)
     zone_id = Column(Integer, ForeignKey("hosted_zones.id", ondelete="CASCADE"))
     name = Column(String)

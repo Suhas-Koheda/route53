@@ -4,10 +4,10 @@ import { useRouter, usePathname } from "next/navigation";
 import AppLayout from "@cloudscape-design/components/app-layout";
 import SideNavigation from "@cloudscape-design/components/side-navigation";
 import TopNavigation from "@cloudscape-design/components/top-navigation";
-import Input from "@cloudscape-design/components/input";
+import Input, { InputProps } from "@cloudscape-design/components/input";
+import { applyMode, Mode } from "@cloudscape-design/global-styles";
 import { useAuth } from "@/context/AuthContext";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import DarkModeToggle from "@/components/DarkModeToggle";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 
 const navItems = [
@@ -50,7 +50,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<InputProps.Ref>(null);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    const enabled = localStorage.getItem("colorMode") === Mode.Dark;
+    // Restore the saved appearance after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDarkMode(enabled);
+    applyMode(enabled ? Mode.Dark : Mode.Light);
+  }, []);
+
+  const toggleDarkMode = () => {
+    const next = darkMode ? Mode.Light : Mode.Dark;
+    setDarkMode(!darkMode);
+    localStorage.setItem("colorMode", next);
+    applyMode(next);
+  };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -78,11 +94,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <TopNavigation
         identity={{ href: "/hosted-zones", title: "Route 53", logo: { src: "/aws-wordmark.svg", alt: "AWS" } }}
-        search={
-          <div ref={searchRef as unknown as React.RefObject<HTMLDivElement>}>
-            <Input value={searchValue} onChange={({ detail }) => setSearchValue(detail.value)} placeholder="Search services, features, FAQs" ariaLabel="Search" />
-          </div>
-        }
+        search={<Input ref={searchRef} value={searchValue} onChange={({ detail }) => setSearchValue(detail.value)} placeholder="Search services, features, FAQs" ariaLabel="Search" />}
         utilities={[
           {
             type: "menu-dropdown",
@@ -102,7 +114,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             items: [{ id: "global", text: "Global" }],
           },
           { type: "button", iconName: "status-info", ariaLabel: "Keyboard shortcuts", onClick: () => setShowShortcuts(true) },
-          { type: "button", iconName: "settings", ariaLabel: "Toggle dark mode", onClick: () => document.getElementById("dark-mode-toggle")?.click() },
+          { type: "button", iconName: darkMode ? "star-filled" : "star", ariaLabel: "Toggle dark mode", onClick: toggleDarkMode },
           {
             type: "menu-dropdown",
             text: user?.split("@")[0] || "Account",
@@ -113,7 +125,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           },
         ]}
       />
-      <DarkModeToggle />
       <ShortcutsHelp visible={showShortcuts} onDismiss={() => setShowShortcuts(false)} />
       <AppLayout
         navigation={

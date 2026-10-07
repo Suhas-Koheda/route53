@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, use } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Table from "@cloudscape-design/components/table";
 import Button from "@cloudscape-design/components/button";
@@ -17,6 +17,7 @@ import Tabs from "@cloudscape-design/components/tabs";
 import Container from "@cloudscape-design/components/container";
 import ColumnLayout from "@cloudscape-design/components/column-layout";
 import ButtonDropdown from "@cloudscape-design/components/button-dropdown";
+import FileUpload from "@cloudscape-design/components/file-upload";
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getRecords, createRecord, updateRecord, deleteRecord, getZone, deleteZone, exportZone, importZone } from "@/lib/api";
 import { useFlashbar } from "@/components/FlashbarProvider";
@@ -53,28 +54,43 @@ function validateValue(type: string, value: string): string | undefined {
   const v = value.trim();
   if (!v) return "Value is required";
   switch (type) {
-    case "A":
-      if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(v)) return "Must be a valid IPv4 address";
+    case "A": {
+      const octets = v.split(".");
+      if (octets.length !== 4 || octets.some((part) => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return "Must be a valid IPv4 address";
       return undefined;
-    case "AAAA":
-      if (!/^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(v) && !/^::$/.test(v)) return "Must be a valid IPv6 address";
+    }
+    case "AAAA": {
+      try {
+        new URL(`http://[${v}]/`);
+      } catch {
+        return "Must be a valid IPv6 address";
+      }
       return undefined;
+    }
     case "CNAME":
     case "NS":
     case "PTR":
-      if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(v)) return "Must be a valid domain name";
+      {
+        const hostname = v.endsWith(".") ? v.slice(0, -1) : v;
+        const labels = hostname.split(".");
+        if (hostname.length > 253 || labels.some((label) => label.length > 63 || !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label))) return "Must be a valid domain name";
+      }
       return undefined;
-    case "MX":
-      if (!/^\d+\s+\S+$/.test(v)) return "Format: priority host (e.g. 10 mail.example.com)";
-      return undefined;
-    case "SRV":
-      if (!/^\d+\s+\d+\s+\d+\s+\S+$/.test(v)) return "Format: priority weight port target";
-      return undefined;
+    case "MX": {
+      const parts = v.split(/\s+/);
+      if (parts.length !== 2 || !/^\d+$/.test(parts[0])) return "Format: priority host (e.g. 10 mail.example.com)";
+      return validateValue("CNAME", parts[1]);
+    }
+    case "SRV": {
+      const parts = v.split(/\s+/);
+      if (parts.length !== 4 || parts.slice(0, 3).some((part) => !/^\d+$/.test(part))) return "Format: priority weight port target";
+      return validateValue("CNAME", parts[3]);
+    }
     case "TXT":
       if (v.length > 255) return "Max 255 characters per string";
       return undefined;
     case "CAA":
-      if (!/^\d+\s+(issue|issuewild|iodef)\s+".*"$/.test(v)) return 'Format: flag tag "value" (e.g. 0 issue "amazon.com")';
+      if (!/^\d{1,3}\s+[A-Za-z0-9_-]+\s+".*"$/.test(v) || Number(v.split(/\s+/, 1)[0]) > 255) return 'Format: flag tag "value" (e.g. 0 issue "amazon.com")';
       return undefined;
     default:
       return undefined;
@@ -108,6 +124,10 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const [valueError, setValueError] = useState<string | undefined>();
   const [ttl, setTtl] = useState("300");
   const [ttlError, setTtlError] = useState<string | undefined>();
+  const [weightError, setWeightError] = useState<string | undefined>();
+  const [regionError, setRegionError] = useState<string | undefined>();
+  const [failoverError, setFailoverError] = useState<string | undefined>();
+  const [identifierError, setIdentifierError] = useState<string | undefined>();
   const [routingPolicy, setRoutingPolicy] = useState("Simple");
   const [weight, setWeight] = useState("");
   const [region, setRegion] = useState("");
@@ -117,7 +137,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const [routingFilter, setRoutingFilter] = useState<SelectProps.Option>(POLICY_OPTIONS[0]);
   const [wrapLines, setWrapLines] = useState(false);
   const [modalError, setModalError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFiles, setImportFiles] = useState<File[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<DnsRecord[] | null>(null);
   const [deleteZoneTarget, setDeleteZoneTarget] = useState(false);
@@ -156,6 +176,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setName(""); setType({ label: "A", value: "A" }); setValue(""); setTtl("300");
     setRoutingPolicy("Simple"); setWeight(""); setRegion(""); setFailoverType("PRIMARY"); setSetIdentifier("");
     setNameError(undefined); setValueError(undefined); setTtlError(undefined); setModalError("");
+    setWeightError(undefined); setRegionError(undefined); setFailoverError(undefined); setIdentifierError(undefined);
     setShowModal(true);
   };
 
@@ -173,6 +194,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setRoutingPolicy(r.routing_policy || "Simple"); setWeight(r.weight != null ? String(r.weight) : "");
     setRegion(r.region || ""); setFailoverType(r.failover_type || "PRIMARY"); setSetIdentifier(r.set_identifier || "");
     setNameError(undefined); setValueError(undefined); setTtlError(undefined); setModalError("");
+    setWeightError(undefined); setRegionError(undefined); setFailoverError(undefined); setIdentifierError(undefined);
     setShowModal(true);
   };
 
@@ -183,9 +205,19 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setValueError(vErr);
     if (vErr) ok = false;
     const ttlNum = Number(ttl);
-    if (Number.isNaN(ttlNum) || ttlNum < 0 || ttlNum > 2147483647) { setTtlError("TTL must be a non-negative integer"); ok = false; } else setTtlError(undefined);
-    if (routingPolicy === "Weighted" && (weight === "" || Number(weight) < 0 || Number(weight) > 255)) ok = false;
-    if (routingPolicy !== "Simple" && !setIdentifier.trim()) ok = false;
+    if (!Number.isInteger(ttlNum) || ttlNum < 0 || ttlNum > 2147483647) { setTtlError("TTL must be a non-negative integer"); ok = false; } else setTtlError(undefined);
+    const weightInvalid = routingPolicy === "Weighted" && (!Number.isInteger(Number(weight)) || weight === "" || Number(weight) < 0 || Number(weight) > 255);
+    setWeightError(weightInvalid ? "Weight must be between 0 and 255" : undefined);
+    if (weightInvalid) ok = false;
+    const regionInvalid = (routingPolicy === "Latency" || routingPolicy === "Geolocation") && !region.trim();
+    setRegionError(regionInvalid ? "A region is required for this routing policy" : undefined);
+    if (regionInvalid) ok = false;
+    const failoverInvalid = routingPolicy === "Failover" && !["PRIMARY", "SECONDARY"].includes(failoverType);
+    setFailoverError(failoverInvalid ? "Choose PRIMARY or SECONDARY" : undefined);
+    if (failoverInvalid) ok = false;
+    const identifierInvalid = routingPolicy !== "Simple" && !setIdentifier.trim();
+    setIdentifierError(identifierInvalid ? "A set identifier is required for this routing policy" : undefined);
+    if (identifierInvalid) ok = false;
     return ok;
   };
 
@@ -269,6 +301,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       const result = await importZone(zoneId, file);
       flash("success", `Imported ${result.imported} record(s), skipped ${result.skipped}`);
       setShowImport(false);
+      setImportFiles([]);
       load();
     } catch (e) {
       flash("error", e instanceof Error ? e.message : "Import failed");
@@ -426,22 +459,22 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
             />
           </FormField>
           {routingPolicy === "Weighted" && (
-            <FormField label="Weight" description="0–255">
+            <FormField label="Weight" description="0–255" errorText={weightError}>
               <Input value={weight} onChange={({ detail }) => setWeight(detail.value)} type="number" />
             </FormField>
           )}
           {(routingPolicy === "Latency" || routingPolicy === "Geolocation") && (
-            <FormField label="Region">
+            <FormField label="Region" errorText={regionError}>
               <Input value={region} onChange={({ detail }) => setRegion(detail.value)} placeholder="us-east-1" />
             </FormField>
           )}
           {routingPolicy === "Failover" && (
-            <FormField label="Failover type">
+            <FormField label="Failover type" errorText={failoverError}>
               <Select selectedOption={{ label: failoverType, value: failoverType }} onChange={({ detail }) => setFailoverType(detail.selectedOption.value ?? "PRIMARY")} options={[{ label: "PRIMARY", value: "PRIMARY" }, { label: "SECONDARY", value: "SECONDARY" }]} />
             </FormField>
           )}
           {routingPolicy !== "Simple" && (
-            <FormField label="Differentiator / set identifier">
+            <FormField label="Differentiator / set identifier" errorText={identifierError}>
               <Input value={setIdentifier} onChange={({ detail }) => setSetIdentifier(detail.value)} placeholder="server-1" />
             </FormField>
           )}
@@ -481,10 +514,8 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
             <Button variant="link" onClick={() => setShowImport(false)}>Cancel</Button>
             <Button
               variant="primary"
-              onClick={() => {
-                const input = fileInputRef.current;
-                if (input && input.files && input.files[0]) handleImport(input.files[0]);
-              }}
+              disabled={importFiles.length === 0}
+              onClick={() => handleImport(importFiles[0] ?? null)}
             >
               Import
             </Button>
@@ -493,7 +524,12 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       }>
         <SpaceBetween size="l">
           <Box>Select a BIND-format zone file (.zone, .bind, .txt) to import records into this hosted zone.</Box>
-          <input ref={fileInputRef} type="file" accept=".zone,.bind,.txt,.db" />
+          <FileUpload
+            accept=".zone,.bind,.txt,.db"
+            value={importFiles}
+            onChange={({ detail }) => setImportFiles(detail.value)}
+            constraintText="Select one BIND-format zone file."
+          />
         </SpaceBetween>
       </Modal>
     </>
