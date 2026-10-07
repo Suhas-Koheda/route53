@@ -63,7 +63,8 @@ export async function updateZone(id: number, data: { name?: string; comment?: st
 }
 
 export async function deleteZone(id: number) {
-  await fetch(`${API_URL}/hosted-zones/${id}`, { method: "DELETE", headers: authHeaders() });
+  const res = await fetch(`${API_URL}/hosted-zones/${id}`, { method: "DELETE", headers: authHeaders() });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
 }
 
 export async function getRecords(zoneId: number) {
@@ -98,5 +99,6 @@ export async function updateRecord(id: number, data: any) {
 }
 
 export async function deleteRecord(id: number) {
-  await fetch(`${API_URL}/records/${id}`, { method: "DELETE", headers: authHeaders() });
+  const res = await fetch(`${API_URL}/records/${id}`, { method: "DELETE", headers: authHeaders() });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
 }

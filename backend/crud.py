@@ -1,5 +1,12 @@
 from sqlalchemy.orm import Session
-import models, schemas, hashlib, secrets
+import models, schemas, secrets, hashlib
+import bcrypt
+
+ns_sets = [
+    ["ns-111.awsdns-01.com.", "ns-222.awsdns-02.net.", "ns-333.awsdns-03.org.", "ns-444.awsdns-04.co.uk."],
+    ["ns-555.awsdns-05.com.", "ns-666.awsdns-06.net.", "ns-777.awsdns-07.org.", "ns-888.awsdns-08.co.uk."],
+    ["ns-999.awsdns-09.com.", "ns-110.awsdns-10.net.", "ns-120.awsdns-11.org.", "ns-130.awsdns-12.co.uk."],
+]
 
 def get_zones(db: Session, user_id: str):
     return db.query(models.HostedZone).filter(models.HostedZone.user_id == user_id).all()
@@ -8,16 +15,22 @@ def get_zone(db: Session, zone_id: int, user_id: str):
     return db.query(models.HostedZone).filter(models.HostedZone.id == zone_id, models.HostedZone.user_id == user_id).first()
 
 def create_zone(db: Session, zone: schemas.HostedZoneCreate, user_id: str):
+    existing = db.query(models.HostedZone).filter(models.HostedZone.user_id == user_id, models.HostedZone.name == zone.name).first()
+    if existing:
+        return None
     db_zone = models.HostedZone(name=zone.name, comment=zone.comment, zone_type=zone.zone_type or "public", user_id=user_id)
     db.add(db_zone)
     db.commit()
     db.refresh(db_zone)
-    # Auto NS records
-    for ns in ["ns-123.awsdns-45.com.", "ns-456.awsdns-67.net.", "ns-789.awsdns-89.org.", "ns-012.awsdns-01.co.uk."]:
+    db_zone.record_count = 0
+    # Deterministic NS/SOA based on zone name
+    idx = int(hashlib.md5(zone.name.encode()).hexdigest(), 16) % 3
+    ns_list = ns_sets[idx]
+    for ns in ns_list:
         db.add(models.Record(zone_id=db_zone.id, name=zone.name, type="NS", value=ns, ttl=172800))
-    # SOA record
-    soa = f"ns-123.awsdns-45.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
+    soa = f"{ns_list[0]} awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
     db.add(models.Record(zone_id=db_zone.id, name=zone.name, type="SOA", value=soa, ttl=900))
+    db_zone.record_count = 5
     db.commit()
     db.refresh(db_zone)
     return db_zone
@@ -50,6 +63,7 @@ def create_record(db: Session, zone_id: int, record: schemas.RecordCreate, user_
         return None
     db_record = models.Record(zone_id=zone_id, **record.model_dump())
     db.add(db_record)
+    zone.record_count = (zone.record_count or 0) + 1
     db.commit()
     db.refresh(db_record)
     return db_record
@@ -77,7 +91,7 @@ def delete_record(db: Session, record_id: int, user_id: str):
         db.commit()
 
 def hash_password(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
 def create_user(db, email, password):
     u = models.User(email=email, password=hash_password(password))
@@ -91,7 +105,7 @@ def get_user_by_email(db, email):
 
 def verify_user(db, email, password):
     u = get_user_by_email(db, email)
-    if u and u.password == hash_password(password):
+    if u and bcrypt.checkpw(password.encode(), u.password.encode()):
         return u
     return None
 

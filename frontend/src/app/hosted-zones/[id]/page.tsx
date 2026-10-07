@@ -14,7 +14,7 @@ import FormField from "@cloudscape-design/components/form-field";
 import Input from "@cloudscape-design/components/input";
 import Select from "@cloudscape-design/components/select";
 import Flashbar from "@cloudscape-design/components/flashbar";
-import { getRecords, createRecord, updateRecord, deleteRecord, getZones } from "@/lib/api";
+import { getRecords, createRecord, updateRecord, deleteRecord, getZones, deleteZone } from "@/lib/api";
 
 const RECORD_TYPES = [
   { label: "A", value: "A" },
@@ -26,6 +26,7 @@ const RECORD_TYPES = [
   { label: "PTR", value: "PTR" },
   { label: "SRV", value: "SRV" },
   { label: "CAA", value: "CAA" },
+  { label: "SOA", value: "SOA" },
 ];
 
 const VALUE_PLACEHOLDERS: Record<string, string> = {
@@ -38,6 +39,7 @@ const VALUE_PLACEHOLDERS: Record<string, string> = {
   PTR: "example.com",
   SRV: "10 5 5060 sip.example.com",
   CAA: '0 issue "amazon.com"',
+  SOA: "ns-111.awsdns-01.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400",
 };
 
 function validateValue(type: string, value: string): string | null {
@@ -87,6 +89,10 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const [value, setValue] = useState("");
   const [ttl, setTtl] = useState("300");
   const [routingPolicy, setRoutingPolicy] = useState("Simple");
+  const [weight, setWeight] = useState("");
+  const [region, setRegion] = useState("");
+  const [failoverType, setFailoverType] = useState("PRIMARY");
+  const [setIdentifier, setSetIdentifier] = useState("");
   const [flashes, setFlashes] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -102,9 +108,11 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   }, [zoneId]);
 
   const [typeFilter, setTypeFilter] = useState("All");
+  const [routingFilter, setRoutingFilter] = useState("All");
   const filtered = (records || []).filter(
     (r) =>
       (typeFilter === "All" || r.type === typeFilter) &&
+      (routingFilter === "All" || (r.routing_policy || "Simple") === routingFilter) &&
       (r.name.toLowerCase().includes(filter.toLowerCase()) ||
         r.type.toLowerCase().includes(filter.toLowerCase()) ||
         r.value.toLowerCase().includes(filter.toLowerCase()))
@@ -123,7 +131,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       flash("error", error);
       return;
     }
-    const data = { name, type: type.value, value, ttl: Number(ttl), routing_policy: routingPolicy };
+    const data = { name, type: type.value, value, ttl: Number(ttl), routing_policy: routingPolicy, weight: weight ? Number(weight) : null, region: region || null, failover_type: failoverType || null, set_identifier: setIdentifier || null };
     try {
       if (editing) {
         await updateRecord(editing.id, data);
@@ -138,6 +146,11 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       setType({ label: "A", value: "A" });
       setValue("");
       setTtl("300");
+      setRoutingPolicy("Simple");
+      setWeight("");
+      setRegion("");
+      setFailoverType("PRIMARY");
+      setSetIdentifier("");
       load();
     } catch (e: any) {
       flash("error", e.message);
@@ -166,20 +179,34 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setValue(record.value);
     setTtl(String(record.ttl));
     setRoutingPolicy(record.routing_policy || "Simple");
+    setWeight(record.weight != null ? String(record.weight) : "");
+    setRegion(record.region || "");
+    setFailoverType(record.failover_type || "PRIMARY");
+    setSetIdentifier(record.set_identifier || "");
     setShowModal(true);
   };
 
   return (
     <>
       <Flashbar items={flashes} />
-      <Header variant="h1" description="DNS records">
+      <Header
+        variant="h1"
+        description="Hosted zone"
+        actions={<Button onClick={async () => { try { await deleteZone(zoneId); router.push("/hosted-zones"); } catch (e: any) { flash("error", e.message); } }}>Delete hosted zone</Button>}
+      >
         {zoneName || "Hosted zone"}
       </Header>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #aab7b8", borderRadius: 4 }}>
           <option value="All">All types</option>
           {["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA", "SOA"].map((t) => (
             <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select value={routingFilter} onChange={(e) => setRoutingFilter(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+          <option value="All">All policies</option>
+          {["Simple", "Weighted", "Latency", "Failover", "Geolocation"].map((p) => (
+            <option key={p} value={p}>{p}</option>
           ))}
         </select>
       </div>
@@ -189,7 +216,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
           { id: "type", header: "Type", cell: (item: any) => item.type },
           { id: "value", header: "Value", cell: (item: any) => item.value },
           { id: "ttl", header: "TTL", cell: (item: any) => item.ttl },
-          { id: "routing_policy", header: "Routing policy", cell: (item: any) => item.routing_policy || "Simple" },
+          { id: "routing_policy", header: "Routing policy", cell: (item: any) => `${item.routing_policy || "Simple"}${item.weight ? ` (w: ${item.weight})` : ""}${item.set_identifier ? ` [${item.set_identifier}]` : ""}` },
           {
             id: "actions",
             header: "Actions",
@@ -208,7 +235,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
           <Header
             counter={`(${filtered.length})`}
             actions={
-              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setType({ label: "A", value: "A" }); setValue(""); setTtl("300"); setShowModal(true); }}>
+              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setType({ label: "A", value: "A" }); setValue(""); setTtl("300"); setRoutingPolicy("Simple"); setWeight(""); setRegion(""); setFailoverType("PRIMARY"); setSetIdentifier(""); setShowModal(true); }}>
                 Create record
               </Button>
             }
@@ -254,6 +281,27 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
               <option value="Failover">Failover</option>
               <option value="Geolocation">Geolocation</option>
             </select>
+          </FormField>
+          {routingPolicy === "Weighted" && (
+            <FormField label="Weight">
+              <Input value={weight} onChange={({ detail }) => setWeight(detail.value)} type="number" />
+            </FormField>
+          )}
+          {(routingPolicy === "Latency" || routingPolicy === "Geolocation") && (
+            <FormField label="Region">
+              <Input value={region} onChange={({ detail }) => setRegion(detail.value)} placeholder="us-east-1" />
+            </FormField>
+          )}
+          {routingPolicy === "Failover" && (
+            <FormField label="Failover type">
+              <select value={failoverType} onChange={(e) => setFailoverType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+                <option value="PRIMARY">PRIMARY</option>
+                <option value="SECONDARY">SECONDARY</option>
+              </select>
+            </FormField>
+          )}
+          <FormField label="Set identifier (optional)">
+            <Input value={setIdentifier} onChange={({ detail }) => setSetIdentifier(detail.value)} placeholder="server-1" />
           </FormField>
         </SpaceBetween>
       </Modal>

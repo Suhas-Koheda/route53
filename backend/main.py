@@ -28,7 +28,10 @@ def list_zones(db: Session = Depends(get_db), user_id: str = Depends(get_user_id
 
 @app.post("/hosted-zones", response_model=schemas.HostedZone)
 def create_zone(zone: schemas.HostedZoneCreate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
-    return crud.create_zone(db, zone, user_id)
+    z = crud.create_zone(db, zone, user_id)
+    if not z:
+        raise HTTPException(409, "A hosted zone with this name already exists")
+    return z
 
 @app.get("/hosted-zones/{zone_id}", response_model=schemas.HostedZone)
 def get_zone(zone_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
