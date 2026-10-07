@@ -33,6 +33,7 @@ export async function loginApi(email: string, password: string) {
 
 export async function getZones() {
   const res = await fetch(`${API_URL}/hosted-zones`, { headers: authHeaders() });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
   return res.json();
 }
 
@@ -69,6 +70,7 @@ export async function deleteZone(id: number) {
 
 export async function getRecords(zoneId: number) {
   const res = await fetch(`${API_URL}/hosted-zones/${zoneId}/records`, { headers: authHeaders() });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Failed"); }
   return res.json();
 }
 

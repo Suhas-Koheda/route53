@@ -120,6 +120,8 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
 
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const [modalError, setModalError] = useState("");
+
   const flash = (type: string, content: string) => {
     setFlashes([{ type, content, dismissible: true, onDismiss: () => setFlashes([]) }]);
     setTimeout(() => setFlashes([]), 3000);
@@ -128,9 +130,10 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const handleSave = async () => {
     const error = validateValue(type.value, value);
     if (error) {
-      flash("error", error);
+      setModalError(error);
       return;
     }
+    setModalError("");
     const data = { name, type: type.value, value, ttl: Number(ttl), routing_policy: routingPolicy, weight: weight ? Number(weight) : null, region: region || null, failover_type: failoverType || null, set_identifier: setIdentifier || null };
     try {
       if (editing) {
@@ -141,6 +144,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
         flash("success", "Record created");
       }
       setShowModal(false);
+      setModalError("");
       setEditing(null);
       setName("");
       setType({ label: "A", value: "A" });
@@ -153,7 +157,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       setSetIdentifier("");
       load();
     } catch (e: any) {
-      flash("error", e.message);
+      setModalError(e.message);
     }
   };
 
@@ -183,6 +187,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setRegion(record.region || "");
     setFailoverType(record.failover_type || "PRIMARY");
     setSetIdentifier(record.set_identifier || "");
+    setModalError("");
     setShowModal(true);
   };
 
@@ -235,7 +240,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
           <Header
             counter={`(${filtered.length})`}
             actions={
-              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setType({ label: "A", value: "A" }); setValue(""); setTtl("300"); setRoutingPolicy("Simple"); setWeight(""); setRegion(""); setFailoverType("PRIMARY"); setSetIdentifier(""); setShowModal(true); }}>
+              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setType({ label: "A", value: "A" }); setValue(""); setTtl("300"); setRoutingPolicy("Simple"); setWeight(""); setRegion(""); setFailoverType("PRIMARY"); setSetIdentifier(""); setModalError(""); setShowModal(true); }}>
                 Create record
               </Button>
             }
@@ -261,7 +266,12 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
         }
       >
         <SpaceBetween size="l">
-          <FormField label="Name">
+          {modalError && (
+            <div key="modal-error" style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13 }}>
+              {modalError}
+            </div>
+          )}
+          <FormField key="name" label="Name">
             <Input value={name} onChange={({ detail }) => setName(detail.value)} placeholder="www.example.com" />
           </FormField>
           <FormField label="Type">
@@ -283,17 +293,17 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
             </select>
           </FormField>
           {routingPolicy === "Weighted" && (
-            <FormField label="Weight">
+            <FormField key="weight" label="Weight">
               <Input value={weight} onChange={({ detail }) => setWeight(detail.value)} type="number" />
             </FormField>
           )}
           {(routingPolicy === "Latency" || routingPolicy === "Geolocation") && (
-            <FormField label="Region">
+            <FormField key="region" label="Region">
               <Input value={region} onChange={({ detail }) => setRegion(detail.value)} placeholder="us-east-1" />
             </FormField>
           )}
           {routingPolicy === "Failover" && (
-            <FormField label="Failover type">
+            <FormField key="failover" label="Failover type">
               <select value={failoverType} onChange={(e) => setFailoverType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
                 <option value="PRIMARY">PRIMARY</option>
                 <option value="SECONDARY">SECONDARY</option>

@@ -18,6 +18,7 @@ import { getZones, createZone, updateZone, deleteZone } from "@/lib/api";
 export default function HostedZonesPage() {
   const [zones, setZones] = useState<any[] | null>(null);
   const [filter, setFilter] = useState("");
+  const [modalError, setModalError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [name, setName] = useState("");
@@ -54,9 +55,10 @@ export default function HostedZonesPage() {
       setName("");
       setComment("");
       setZoneType("public");
+      setModalError("");
       load();
     } catch (e: any) {
-      flash("error", e.message);
+      setModalError(e.message);
     }
   };
 
@@ -80,6 +82,7 @@ export default function HostedZonesPage() {
     setName(zone.name);
     setComment(zone.comment || "");
     setZoneType(zone.zone_type || "public");
+    setModalError("");
     setShowModal(true);
   };
 
@@ -116,7 +119,7 @@ export default function HostedZonesPage() {
           <Header
             counter={`(${filtered.length})`}
             actions={
-              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setComment(""); setShowModal(true); }}>
+              <Button variant="primary" onClick={() => { setEditing(null); setName(""); setComment(""); setZoneType("public"); setModalError(""); setShowModal(true); }}>
                 Create hosted zone
               </Button>
             }
@@ -142,6 +145,11 @@ export default function HostedZonesPage() {
         }
       >
         <SpaceBetween size="l">
+          {modalError && (
+            <div style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13 }}>
+              {modalError}
+            </div>
+          )}
           <FormField label="Domain name">
             <Input value={name} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
           </FormField>
