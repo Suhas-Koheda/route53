@@ -42,7 +42,7 @@ App runs at `http://localhost:3000`.
 └─────────────┘                   └─────────────┘              └──────────┘
 ```
 
-- **Frontend** handles UI, auth state (localStorage), and calls the backend API.
+- **Frontend** handles UI, stores the returned session token (localStorage + `session` cookie for route protection), and calls the backend API with `Authorization: Bearer <token>`.
 - **Backend** exposes REST endpoints for hosted zones and records.
 - **SQLite** persists all data in a single file.
 
@@ -87,12 +87,24 @@ App runs at `http://localhost:3000`.
 | POST   | /hosted-zones/{id}/records      | Create record     |
 | PUT    | /records/{id}                   | Update record     |
 | DELETE | /records/{id}                   | Delete record     |
+| POST   | /auth/signup                    | Register          |
+| POST   | /auth/login                     | Login → token     |
+| POST   | /auth/logout                    | Invalidate token  |
+| GET    | /auth/me                        | Current session   |
+
+### sessions
+| Column     | Type    | Notes          |
+|------------|---------|----------------|
+| id         | INTEGER | PK             |
+| token      | STRING  | Unique         |
+| user_email | STRING  | Owner          |
+| created_at | DATETIME| Expires 7 days |
 
 ## Features
 
 - Mock authentication via session tokens: login returns a token stored in SQLite, sent as `Authorization: Bearer <token>`, expires after 7 days
 - Hosted Zones: View, Search, Create, Edit, Delete
-- DNS Records: View, Search, Create, Edit, Delete (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA)
+- DNS Records: View, Search, Create, Edit, Delete (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA, SOA)
 - Pagination on tables
 - Modals, notifications (Flashbar)
 - Mocked sections: Dashboard, Traffic Policies, Health Checks, Resolver, Profiles (Coming Soon)

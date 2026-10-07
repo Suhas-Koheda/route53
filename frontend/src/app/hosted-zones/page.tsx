@@ -146,17 +146,17 @@ export default function HostedZonesPage() {
       >
         <SpaceBetween size="l">
           {modalError && (
-            <div style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13 }}>
+            <div key="modal-error" style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13 }}>
               {modalError}
             </div>
           )}
-          <FormField label="Domain name">
+          <FormField key="name" label="Domain name">
             <Input value={name} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
           </FormField>
-          <FormField label="Comment (optional)">
+          <FormField key="comment" label="Comment (optional)">
             <Input value={comment} onChange={({ detail }) => setComment(detail.value)} />
           </FormField>
-          <FormField label="Type">
+          <FormField key="type" label="Type">
             <select value={zoneType} onChange={(e) => setZoneType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
               <option value="public">Public hosted zone</option>
               <option value="private">Private hosted zone</option>
