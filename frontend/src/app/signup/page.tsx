@@ -21,7 +21,7 @@ export default function SignupPage() {
       const res = await signup(email, password);
       localStorage.setItem("user", res.email);
       localStorage.setItem("token", res.token);
-      document.cookie = `user=${res.email}; path=/; max-age=86400`;
+      document.cookie = `session=${res.token}; path=/; max-age=86400`;
       router.push("/hosted-zones");
     } catch (e: any) {
       setError(e.message);

@@ -51,9 +51,13 @@ App runs at `http://localhost:3000`.
 ### hosted_zones
 | Column  | Type    | Notes              |
 |---------|---------|--------------------|
-| id      | INTEGER | Primary key        |
-| name    | STRING  | Indexed            |
-| comment | STRING  | Nullable           |
+| id        | INTEGER | Primary key                    |
+| name      | STRING  | Unique per user                |
+| comment   | STRING  | Nullable                       |
+| user_id   | STRING  | Owner email                    |
+| zone_type | STRING  | public / private               |
+| created_at| DATETIME| Auto                           |
+| record_count | INTEGER | Maintained on record CRUD |
 
 ### records
 | Column  | Type    | Notes                     |
@@ -64,6 +68,11 @@ App runs at `http://localhost:3000`.
 | type    | STRING  | A, AAAA, CNAME, TXT, etc. |
 | value   | STRING  | Record value              |
 | ttl     | INTEGER | Default 300               |
+| routing_policy | STRING | Simple/Weighted/... |
+| weight  | INTEGER | Nullable                |
+| region  | STRING  | Nullable                |
+| failover_type | STRING | Nullable       |
+| set_identifier | STRING | Nullable         |
 
 ## API Overview
 
@@ -81,7 +90,7 @@ App runs at `http://localhost:3000`.
 
 ## Features
 
-- Mock authentication (login/logout/session persistence)
+- Mock authentication via session tokens: login returns a token stored in SQLite, sent as `Authorization: Bearer <token>`, expires after 7 days
 - Hosted Zones: View, Search, Create, Edit, Delete
 - DNS Records: View, Search, Create, Edit, Delete (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA)
 - Pagination on tables

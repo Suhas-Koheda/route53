@@ -10,7 +10,7 @@ app = FastAPI(title="Route53 Clone API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", __import__("os").environ.get("FRONTEND_URL", "http://localhost:3000")],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -20,6 +20,10 @@ def get_user_id(authorization: str = Header(default=""), db: Session = Depends(g
     sess = crud.get_session(db, token)
     if not sess:
         raise HTTPException(401, "Invalid or expired session")
+    from datetime import datetime, timezone, timedelta
+    if sess.created_at and sess.created_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc) - timedelta(days=7):
+        crud.delete_session(db, token)
+        raise HTTPException(401, "Session expired")
     return sess.user_email
 
 @app.get("/hosted-zones", response_model=list[schemas.HostedZone])
@@ -42,6 +46,10 @@ def get_zone(zone_id: int, db: Session = Depends(get_db), user_id: str = Depends
 
 @app.put("/hosted-zones/{zone_id}", response_model=schemas.HostedZone)
 def update_zone(zone_id: int, zone: schemas.HostedZoneUpdate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+    if zone.name:
+        dup = db.query(models.HostedZone).filter(models.HostedZone.user_id == user_id, models.HostedZone.name == zone.name, models.HostedZone.id != zone_id).first()
+        if dup:
+            raise HTTPException(409, "A hosted zone with this name already exists")
     z = crud.update_zone(db, zone_id, zone, user_id)
     if not z:
         raise HTTPException(404, "Zone not found")

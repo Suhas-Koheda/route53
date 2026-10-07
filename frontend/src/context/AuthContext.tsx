@@ -21,9 +21,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("user");
-    if (saved) {
+    const tok = localStorage.getItem("token");
+    if (saved && tok) {
       setUser(saved);
-      document.cookie = `user=${saved}; path=/; max-age=86400`;
+      document.cookie = `session=${tok}; path=/; max-age=86400`;
     }
   }, []);
 
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await loginApi(email, password);
     localStorage.setItem("user", res.email);
     localStorage.setItem("token", res.token);
-    document.cookie = `user=${res.email}; path=/; max-age=86400`;
+    document.cookie = `session=${res.token}; path=/; max-age=86400`;
     setUser(res.email);
     router.push("/hosted-zones");
   };
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }); } catch {}
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    document.cookie = "user=; path=/; max-age=0";
+    document.cookie = "session=; path=/; max-age=0";
     setUser(null);
     router.push("/login");
   };

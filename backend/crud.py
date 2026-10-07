@@ -87,6 +87,9 @@ def update_record(db: Session, record_id: int, record: schemas.RecordUpdate, use
 def delete_record(db: Session, record_id: int, user_id: str):
     db_record = get_record(db, record_id, user_id)
     if db_record:
+        zone = get_zone(db, db_record.zone_id, user_id)
+        if zone:
+            zone.record_count = max((zone.record_count or 0) - 1, 0)
         db.delete(db_record)
         db.commit()
 

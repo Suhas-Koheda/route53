@@ -1,10 +1,11 @@
 from database import Base
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
 class HostedZone(Base):
     __tablename__ = "hosted_zones"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_user_zone_name"),)
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     comment = Column(String, nullable=True)

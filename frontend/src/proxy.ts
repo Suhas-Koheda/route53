@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = ["/login", "/signup", "/"];
 
 export function proxy(request: NextRequest) {
-  const user = request.cookies.get("user");
+  const session = request.cookies.get("session");
   const { pathname } = request.nextUrl;
 
   if (pathname === "/login" || pathname === "/signup") {
-    if (user) {
+    if (session) {
       return NextResponse.redirect(new URL("/hosted-zones", request.url));
     }
     return NextResponse.next();
@@ -17,7 +17,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!user) {
+  if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
