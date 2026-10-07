@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
+from datetime import datetime
 import re
 
 def no_sql_injection(v: str) -> str:
@@ -43,7 +44,7 @@ class HostedZoneUpdate(BaseModel):
 class HostedZone(HostedZoneCreate):
     id: int
     record_count: int = 0
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class RecordCreate(BaseModel):
