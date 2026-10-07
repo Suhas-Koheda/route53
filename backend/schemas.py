@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, EmailStr
+from pydantic import BaseModel, field_validator
 from typing import Optional
 import re
 
@@ -10,9 +10,12 @@ def no_sql_injection(v: str) -> str:
         raise ValueError("Input contains forbidden keywords")
     return v
 
+ALLOWED_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA", "SOA"]
+
 class HostedZoneCreate(BaseModel):
     name: str
     comment: Optional[str] = None
+    zone_type: Optional[str] = "public"
 
     @field_validator("name")
     @classmethod
@@ -30,6 +33,7 @@ class HostedZoneCreate(BaseModel):
 class HostedZoneUpdate(BaseModel):
     name: Optional[str] = None
     comment: Optional[str] = None
+    zone_type: Optional[str] = None
 
     @field_validator("name", "comment")
     @classmethod
@@ -38,6 +42,8 @@ class HostedZoneUpdate(BaseModel):
 
 class HostedZone(HostedZoneCreate):
     id: int
+    record_count: int = 0
+    created_at: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class RecordCreate(BaseModel):
@@ -45,6 +51,7 @@ class RecordCreate(BaseModel):
     type: str
     value: str
     ttl: int = 300
+    routing_policy: str = "Simple"
 
     @field_validator("name", "value")
     @classmethod
@@ -54,8 +61,7 @@ class RecordCreate(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v):
-        allowed = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA"]
-        if v.upper() not in allowed:
+        if v.upper() not in ALLOWED_TYPES:
             raise ValueError("Invalid record type")
         return v.upper()
 
@@ -71,6 +77,7 @@ class RecordUpdate(BaseModel):
     type: Optional[str] = None
     value: Optional[str] = None
     ttl: Optional[int] = None
+    routing_policy: Optional[str] = None
 
     @field_validator("name", "value")
     @classmethod
@@ -80,8 +87,7 @@ class RecordUpdate(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v):
-        allowed = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA"]
-        if v and v.upper() not in allowed:
+        if v and v.upper() not in ALLOWED_TYPES:
             raise ValueError("Invalid record type")
         return v
 

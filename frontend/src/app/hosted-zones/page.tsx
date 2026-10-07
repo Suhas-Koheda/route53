@@ -16,21 +16,22 @@ import Flashbar from "@cloudscape-design/components/flashbar";
 import { getZones, createZone, updateZone, deleteZone } from "@/lib/api";
 
 export default function HostedZonesPage() {
-  const [zones, setZones] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[] | null>(null);
   const [filter, setFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [name, setName] = useState("");
   const [comment, setComment] = useState("");
+  const [zoneType, setZoneType] = useState("public");
   const [flashes, setFlashes] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const router = useRouter();
 
-  const load = () => getZones().then(setZones);
+  const load = () => getZones().then(setZones).catch(() => { setZones([]); flash("error", "Unable to load hosted zones"); });
   useEffect(() => { load(); }, []);
 
-  const filtered = zones.filter((z) => z.name.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = (zones || []).filter((z) => z.name.toLowerCase().includes(filter.toLowerCase()));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const flash = (type: string, content: string) => {
@@ -42,27 +43,35 @@ export default function HostedZonesPage() {
   const handleSave = async () => {
     try {
       if (editing) {
-        await updateZone(editing.id, { name, comment });
+        await updateZone(editing.id, { name, comment, zone_type: zoneType });
         flash("success", "Hosted zone updated");
       } else {
-        await createZone(name, comment);
+        await createZone(name, comment, zoneType);
         flash("success", "Hosted zone created");
       }
       setShowModal(false);
       setEditing(null);
       setName("");
       setComment("");
+      setZoneType("public");
       load();
     } catch (e: any) {
       flash("error", e.message);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm("Delete this hosted zone?")) {
-      await deleteZone(id);
-      flash("success", "Hosted zone deleted");
-      load();
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const handleDelete = async () => {
+    if (deleteId != null) {
+      try {
+        await deleteZone(deleteId);
+        flash("success", "Hosted zone deleted");
+        load();
+      } catch (e: any) {
+        flash("error", e.message);
+      }
+      setDeleteId(null);
     }
   };
 
@@ -70,6 +79,7 @@ export default function HostedZonesPage() {
     setEditing(zone);
     setName(zone.name);
     setComment(zone.comment || "");
+    setZoneType(zone.zone_type || "public");
     setShowModal(true);
   };
 
@@ -86,13 +96,15 @@ export default function HostedZonesPage() {
             ),
           },
           { id: "comment", header: "Comment", cell: (item: any) => item.comment || "—" },
+          { id: "zone_type", header: "Type", cell: (item: any) => item.zone_type === "private" ? "Private" : "Public" },
+          { id: "record_count", header: "Records", cell: (item: any) => item.record_count ?? "—" },
           {
             id: "actions",
             header: "Actions",
             cell: (item: any) => (
               <SpaceBetween direction="horizontal" size="xs">
                 <Link onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
-                <Link onFollow={(e) => { e.preventDefault(); handleDelete(item.id); }}>Delete</Link>
+                <Link onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
               </SpaceBetween>
             ),
           },
@@ -113,7 +125,7 @@ export default function HostedZonesPage() {
           </Header>
         }
         filter={<TextFilter filteringText={filter} onChange={({ detail }) => setFilter(detail.filteringText)} />}
-        empty={<Box textAlign="center" color="inherit"><b>No hosted zones</b></Box>}
+        empty={zones === null ? "Loading hosted zones..." : "No hosted zones. Create one to get started."}
       />
 
       <Modal
@@ -136,7 +148,29 @@ export default function HostedZonesPage() {
           <FormField label="Comment (optional)">
             <Input value={comment} onChange={({ detail }) => setComment(detail.value)} />
           </FormField>
+          <FormField label="Type">
+            <select value={zoneType} onChange={(e) => setZoneType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+              <option value="public">Public hosted zone</option>
+              <option value="private">Private hosted zone</option>
+            </select>
+          </FormField>
         </SpaceBetween>
+      </Modal>
+
+      <Modal
+        visible={deleteId !== null}
+        onDismiss={() => setDeleteId(null)}
+        header="Delete hosted zone?"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setDeleteId(null)}>Cancel</Button>
+              <Button variant="primary" onClick={handleDelete}>Delete</Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        Are you sure you want to delete this hosted zone and all its records? This action cannot be undone.
       </Modal>
     </>
   );

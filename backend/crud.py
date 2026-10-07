@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
-import models, schemas
-
+import models, schemas, hashlib, secrets
 
 def get_zones(db: Session, user_id: str):
     return db.query(models.HostedZone).filter(models.HostedZone.user_id == user_id).all()
@@ -9,8 +8,16 @@ def get_zone(db: Session, zone_id: int, user_id: str):
     return db.query(models.HostedZone).filter(models.HostedZone.id == zone_id, models.HostedZone.user_id == user_id).first()
 
 def create_zone(db: Session, zone: schemas.HostedZoneCreate, user_id: str):
-    db_zone = models.HostedZone(name=zone.name, comment=zone.comment, user_id=user_id)
+    db_zone = models.HostedZone(name=zone.name, comment=zone.comment, zone_type=zone.zone_type or "public", user_id=user_id)
     db.add(db_zone)
+    db.commit()
+    db.refresh(db_zone)
+    # Auto NS records
+    for ns in ["ns-123.awsdns-45.com.", "ns-456.awsdns-67.net.", "ns-789.awsdns-89.org.", "ns-012.awsdns-01.co.uk."]:
+        db.add(models.Record(zone_id=db_zone.id, name=zone.name, type="NS", value=ns, ttl=172800))
+    # SOA record
+    soa = f"ns-123.awsdns-45.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
+    db.add(models.Record(zone_id=db_zone.id, name=zone.name, type="SOA", value=soa, ttl=900))
     db.commit()
     db.refresh(db_zone)
     return db_zone
@@ -69,8 +76,11 @@ def delete_record(db: Session, record_id: int, user_id: str):
         db.delete(db_record)
         db.commit()
 
+def hash_password(pw: str) -> str:
+    return hashlib.sha256(pw.encode()).hexdigest()
+
 def create_user(db, email, password):
-    u = models.User(email=email, password=password)
+    u = models.User(email=email, password=hash_password(password))
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -78,3 +88,25 @@ def create_user(db, email, password):
 
 def get_user_by_email(db, email):
     return db.query(models.User).filter(models.User.email == email).first()
+
+def verify_user(db, email, password):
+    u = get_user_by_email(db, email)
+    if u and u.password == hash_password(password):
+        return u
+    return None
+
+def create_session(db, email):
+    token = secrets.token_hex(32)
+    s = models.Session(token=token, user_email=email)
+    db.add(s)
+    db.commit()
+    return s
+
+def get_session(db, token):
+    return db.query(models.Session).filter(models.Session.token == token).first()
+
+def delete_session(db, token):
+    s = get_session(db, token)
+    if s:
+        db.delete(s)
+        db.commit()

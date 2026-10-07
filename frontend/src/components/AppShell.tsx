@@ -40,6 +40,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <TopNavigation
         identity={{ href: "/hosted-zones", title: "Route 53" }}
         utilities={[
+          { type: "button", text: "us-east-1", ariaLabel: "Region" },
           { type: "button", iconName: "notification", ariaLabel: "Notifications" },
           {
             type: "menu-dropdown",
@@ -60,7 +61,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           />
         }
         content={children}
-        breadcrumbs={<span>Route 53 / {pathname.split("/")[1] || "Hosted zones"}</span>}
+        breadcrumbs={
+          <span>
+            Route 53 /{" "}
+            {pathname.startsWith("/hosted-zones/")
+              ? "Hosted zones / " + (pathname.split("/")[2] || "")
+              : pathname.split("/")[1] || "Hosted zones"}
+          </span>
+        }
       />
     </>
   );

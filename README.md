@@ -6,7 +6,7 @@ A full-stack clone of the AWS Route 53 console built with Next.js, FastAPI, and 
 
 | Layer    | Technology              |
 |----------|-------------------------|
-| Frontend | Next.js 14+ (TypeScript, Tailwind, Cloudscape Design System) |
+| Frontend | Next.js 16+ (TypeScript, Tailwind, Cloudscape Design System) |
 | Backend  | FastAPI (Python)        |
 | Database | SQLite (via SQLAlchemy) |
 
@@ -92,7 +92,7 @@ App runs at `http://localhost:3000`.
 
 - **Frontend**: Deploy to Vercel (`frontend/` directory)
 - **Backend**: Deploy to Railway/Render
-- Set `NEXT_PUBLIC_API_URL` environment variable to your backend URL
+- Frontend proxies `/api/*` to the backend via Next.js rewrites (localhost:8000 in dev, internal in Docker)
 
 ## Demo
 

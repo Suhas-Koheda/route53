@@ -14,10 +14,10 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
     try {
-      await signup(email, password);
-      await loginApi(email, password);
-      localStorage.setItem("user", email);
-      document.cookie = `user=${email}; path=/; max-age=86400`;
+      const res = await signup(email, password);
+      localStorage.setItem("user", res.email);
+      localStorage.setItem("token", res.token);
+      document.cookie = `user=${res.email}; path=/; max-age=86400`;
       router.push("/hosted-zones");
     } catch (e: any) {
       setError(e.message);

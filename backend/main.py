@@ -15,8 +15,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_user_id(x_user_id: str = Header(default="anonymous")):
-    return x_user_id
+def get_user_id(authorization: str = Header(default=""), db: Session = Depends(get_db)):
+    token = authorization.replace("Bearer ", "")
+    sess = crud.get_session(db, token)
+    if not sess:
+        raise HTTPException(401, "Invalid or expired session")
+    return sess.user_email
 
 @app.get("/hosted-zones", response_model=list[schemas.HostedZone])
 def list_zones(db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
@@ -75,11 +79,27 @@ def delete_record(record_id: int, db: Session = Depends(get_db), user_id: str = 
 def signup(data: schemas.UserCreate, db: Session = Depends(get_db)):
     if crud.get_user_by_email(db, data.email):
         raise HTTPException(400, "Email already registered")
-    return {"email": crud.create_user(db, data.email, data.password).email}
+    u = crud.create_user(db, data.email, data.password)
+    sess = crud.create_session(db, data.email)
+    return {"email": u.email, "token": sess.token}
 
 @app.post("/auth/login")
 def login(data: schemas.UserLogin, db: Session = Depends(get_db)):
-    u = crud.get_user_by_email(db, data.email)
-    if not u or u.password != data.password:
+    u = crud.verify_user(db, data.email, data.password)
+    if not u:
         raise HTTPException(401, "Invalid credentials")
-    return {"email": u.email}
+    sess = crud.create_session(db, data.email)
+    return {"email": u.email, "token": sess.token}
+
+@app.post("/auth/logout")
+def logout(authorization: str = Header(default=""), db: Session = Depends(get_db)):
+    crud.delete_session(db, authorization.replace("Bearer ", ""))
+    return {"ok": True}
+
+@app.get("/auth/me")
+def me(authorization: str = Header(default=""), db: Session = Depends(get_db)):
+    token = authorization.replace("Bearer ", "")
+    sess = crud.get_session(db, token)
+    if not sess:
+        raise HTTPException(401, "Invalid or expired session")
+    return {"email": sess.user_email}

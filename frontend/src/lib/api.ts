@@ -1,8 +1,8 @@
 const API_URL = "/api";
 
 function authHeaders() {
-  const user = typeof window !== "undefined" ? localStorage.getItem("user") || "anonymous" : "anonymous";
-  return { "Content-Type": "application/json", "X-User-Id": user };
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 
 export async function signup(email: string, password: string) {
@@ -11,7 +11,10 @@ export async function signup(email: string, password: string) {
     headers: authHeaders(),
     body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) throw new Error((await res.json()).detail || "Signup failed");
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Signup failed");
+  }
   return res.json();
 }
 
@@ -21,7 +24,10 @@ export async function loginApi(email: string, password: string) {
     headers: authHeaders(),
     body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) throw new Error((await res.json()).detail || "Login failed");
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(", ") : err.detail || "Login failed");
+  }
   return res.json();
 }
 
@@ -30,11 +36,11 @@ export async function getZones() {
   return res.json();
 }
 
-export async function createZone(name: string, comment?: string) {
+export async function createZone(name: string, comment?: string, zoneType?: string) {
   const res = await fetch(`${API_URL}/hosted-zones`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ name, comment }),
+    body: JSON.stringify({ name, comment, zone_type: zoneType }),
   });
   if (!res.ok) {
     const err = await res.json();
@@ -43,7 +49,7 @@ export async function createZone(name: string, comment?: string) {
   return res.json();
 }
 
-export async function updateZone(id: number, data: { name?: string; comment?: string }) {
+export async function updateZone(id: number, data: { name?: string; comment?: string; zone_type?: string }) {
   const res = await fetch(`${API_URL}/hosted-zones/${id}`, {
     method: "PUT",
     headers: authHeaders(),

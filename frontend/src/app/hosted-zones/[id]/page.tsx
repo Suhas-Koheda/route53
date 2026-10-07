@@ -55,6 +55,8 @@ function validateValue(type: string, value: string): string | null {
     case "PTR":
       if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(v)) return "Invalid domain name";
       return null;
+    case "SOA":
+      return null;
     case "MX":
       if (!/^\d+\s+\S+$/.test(v)) return "Format: priority domain (e.g. 10 mail.example.com)";
       return null;
@@ -75,7 +77,7 @@ function validateValue(type: string, value: string): string | null {
 export default function ZoneDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const zoneId = Number(id);
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<any[] | null>(null);
   const [zoneName, setZoneName] = useState("");
   const [filter, setFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -84,12 +86,13 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const [type, setType] = useState({ label: "A", value: "A" });
   const [value, setValue] = useState("");
   const [ttl, setTtl] = useState("300");
+  const [routingPolicy, setRoutingPolicy] = useState("Simple");
   const [flashes, setFlashes] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
   const router = useRouter();
 
-  const load = () => getRecords(zoneId).then(setRecords);
+  const load = () => getRecords(zoneId).then(setRecords).catch(() => { setRecords([]); flash("error", "Unable to load records"); });
   useEffect(() => {
     load();
     getZones().then((zones: any[]) => {
@@ -98,11 +101,13 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     });
   }, [zoneId]);
 
-  const filtered = records.filter(
+  const [typeFilter, setTypeFilter] = useState("All");
+  const filtered = (records || []).filter(
     (r) =>
-      r.name.toLowerCase().includes(filter.toLowerCase()) ||
-      r.type.toLowerCase().includes(filter.toLowerCase()) ||
-      r.value.toLowerCase().includes(filter.toLowerCase())
+      (typeFilter === "All" || r.type === typeFilter) &&
+      (r.name.toLowerCase().includes(filter.toLowerCase()) ||
+        r.type.toLowerCase().includes(filter.toLowerCase()) ||
+        r.value.toLowerCase().includes(filter.toLowerCase()))
   );
 
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -118,7 +123,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       flash("error", error);
       return;
     }
-    const data = { name, type: type.value, value, ttl: Number(ttl) };
+    const data = { name, type: type.value, value, ttl: Number(ttl), routing_policy: routingPolicy };
     try {
       if (editing) {
         await updateRecord(editing.id, data);
@@ -139,20 +144,28 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleDelete = async (recordId: number) => {
-    if (confirm("Delete this record?")) {
-      await deleteRecord(recordId);
-      flash("success", "Record deleted");
-      load();
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const handleDelete = async () => {
+    if (deleteId != null) {
+      try {
+        await deleteRecord(deleteId);
+        flash("success", "Record deleted");
+        load();
+      } catch (e: any) {
+        flash("error", e.message);
+      }
+      setDeleteId(null);
     }
   };
 
   const openEdit = (record: any) => {
     setEditing(record);
     setName(record.name);
-    setType({ label: record.type, value: record.type });
+    setType(record.type ? { label: record.type, value: record.type } : { label: "A", value: "A" });
     setValue(record.value);
     setTtl(String(record.ttl));
+    setRoutingPolicy(record.routing_policy || "Simple");
     setShowModal(true);
   };
 
@@ -162,19 +175,28 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
       <Header variant="h1" description="DNS records">
         {zoneName || "Hosted zone"}
       </Header>
+      <div style={{ marginBottom: 12 }}>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+          <option value="All">All types</option>
+          {["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SRV", "CAA", "SOA"].map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
       <Table
         columnDefinitions={[
           { id: "name", header: "Name", cell: (item: any) => item.name },
           { id: "type", header: "Type", cell: (item: any) => item.type },
           { id: "value", header: "Value", cell: (item: any) => item.value },
           { id: "ttl", header: "TTL", cell: (item: any) => item.ttl },
+          { id: "routing_policy", header: "Routing policy", cell: (item: any) => item.routing_policy || "Simple" },
           {
             id: "actions",
             header: "Actions",
             cell: (item: any) => (
               <SpaceBetween direction="horizontal" size="xs">
                 <Link onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
-                <Link onFollow={(e) => { e.preventDefault(); handleDelete(item.id); }}>Delete</Link>
+                <Link onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
               </SpaceBetween>
             ),
           },
@@ -195,7 +217,7 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
           </Header>
         }
         filter={<TextFilter filteringText={filter} onChange={({ detail }) => setFilter(detail.filteringText)} />}
-        empty={<Box textAlign="center" color="inherit"><b>No records</b></Box>}
+        empty={records === null ? "Loading records..." : "No records"}
       />
 
       <Modal
@@ -224,7 +246,32 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
           <FormField label="TTL">
             <Input value={ttl} onChange={({ detail }) => setTtl(detail.value)} type="number" />
           </FormField>
+          <FormField label="Routing policy">
+            <select value={routingPolicy} onChange={(e) => setRoutingPolicy(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+              <option value="Simple">Simple routing</option>
+              <option value="Weighted">Weighted</option>
+              <option value="Latency">Latency-based</option>
+              <option value="Failover">Failover</option>
+              <option value="Geolocation">Geolocation</option>
+            </select>
+          </FormField>
         </SpaceBetween>
+      </Modal>
+
+      <Modal
+        visible={deleteId !== null}
+        onDismiss={() => setDeleteId(null)}
+        header="Delete record?"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setDeleteId(null)}>Cancel</Button>
+              <Button variant="primary" onClick={handleDelete}>Delete</Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        Are you sure you want to delete this record? This action cannot be undone.
       </Modal>
     </>
   );

@@ -6,7 +6,7 @@ import { loginApi } from "@/lib/api";
 interface AuthContextType {
   user: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void> | void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,15 +28,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await loginApi(email, password);
-    localStorage.setItem("user", email);
-    document.cookie = `user=${email}; path=/; max-age=86400`;
-    setUser(email);
+    const res = await loginApi(email, password);
+    localStorage.setItem("user", res.email);
+    localStorage.setItem("token", res.token);
+    document.cookie = `user=${res.email}; path=/; max-age=86400`;
+    setUser(res.email);
     router.push("/hosted-zones");
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try { await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }); } catch {}
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     document.cookie = "user=; path=/; max-age=0";
     setUser(null);
     router.push("/login");
