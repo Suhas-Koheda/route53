@@ -4,3 +4,4 @@ sqlalchemy
 bcrypt
 httpx
 pytest
+python-multipart

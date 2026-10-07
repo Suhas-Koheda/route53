@@ -13,10 +13,13 @@ class HostedZone(Base):
     zone_type = Column(String, default="public")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     record_count = Column(Integer, default=0)
+    created_by = Column(String, nullable=True)
+    zone_id_str = Column(String, nullable=True, index=True)
     records = relationship("Record", back_populates="zone", cascade="all, delete-orphan")
 
 class Record(Base):
     __tablename__ = "records"
+    __table_args__ = (Index("ix_records_zone_id", "zone_id"),)
     id = Column(Integer, primary_key=True, index=True)
     zone_id = Column(Integer, ForeignKey("hosted_zones.id", ondelete="CASCADE"))
     name = Column(String)

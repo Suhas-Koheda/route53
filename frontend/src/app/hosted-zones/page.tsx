@@ -44,7 +44,7 @@ export default function HostedZonesPage() {
   const handleSave = async () => {
     try {
       if (editing) {
-        await updateZone(editing.id, { name, comment, zone_type: zoneType });
+        await updateZone(editing.id, { comment });
         flash("success", "Hosted zone updated");
       } else {
         await createZone(name, comment, zoneType);
@@ -150,14 +150,14 @@ export default function HostedZonesPage() {
               {modalError}
             </div>
           )}
-          <FormField key="name" label="Domain name">
-            <Input value={name} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
+          <FormField key="name" label="Domain name" description={editing ? "Cannot be renamed" : undefined}>
+            <Input value={name} disabled={!!editing} onChange={({ detail }) => setName(detail.value)} placeholder="example.com" />
           </FormField>
           <FormField key="comment" label="Comment (optional)">
             <Input value={comment} onChange={({ detail }) => setComment(detail.value)} />
           </FormField>
-          <FormField key="type" label="Type">
-            <select value={zoneType} onChange={(e) => setZoneType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
+          <FormField key="type" label="Type" description={editing ? "Cannot be changed" : undefined}>
+            <select value={zoneType} disabled={!!editing} onChange={(e) => setZoneType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid #aab7b8", borderRadius: 4 }}>
               <option value="public">Public hosted zone</option>
               <option value="private">Private hosted zone</option>
             </select>
