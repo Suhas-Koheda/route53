@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Table from "@cloudscape-design/components/table";
 import Button from "@cloudscape-design/components/button";
@@ -144,12 +144,14 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
   const [deleteZoneConfirm, setDeleteZoneConfirm] = useState("");
   const [showImport, setShowImport] = useState(false);
 
-  const load = () => getRecords(zoneId).then(setRecords).catch(() => { setRecords([]); flash("error", "Unable to load records"); });
+  const load = useCallback(
+    () => getRecords(zoneId).then(setRecords).catch(() => { setRecords([]); flash("error", "Unable to load records"); }),
+    [zoneId, flash]
+  );
   useEffect(() => {
     load();
     getZone(zoneId).then(setZone).catch(() => setZone(null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoneId]);
+  }, [zoneId, load]);
 
   const filtered = (records || []).filter(
     (r) =>

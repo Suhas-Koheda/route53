@@ -11,9 +11,7 @@ function clearSessionAndRedirect() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   document.cookie = "session=; path=/; max-age=0";
-  // Full reload clears all React state; acceptable for a hard sign-out redirect.
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-  window.location.href = "/login";
+  window.location.assign(new URL("/login", window.location.origin).toString());
 }
 
 interface FastApiError {
@@ -22,18 +20,14 @@ interface FastApiError {
 
 async function parseError(res: Response): Promise<Error> {
   let message = `Request failed (${res.status})`;
-  try {
-    const body: FastApiError = await res.json();
-    if (Array.isArray(body.detail)) {
-      message = body.detail
-        .map((d) => (typeof d === "string" ? d : d && typeof d === "object" && "msg" in d ? String(d.msg) : ""))
-        .filter(Boolean)
-        .join(", ") || message;
-    } else if (typeof body.detail === "string") {
-      message = body.detail;
-    }
-  } catch {
-    /* ignore parse errors */
+  const body: FastApiError | null = await res.json().catch(() => null) as FastApiError | null;
+  if (Array.isArray(body?.detail)) {
+    message = body.detail
+      .map((d) => (typeof d === "string" ? d : d && typeof d === "object" && "msg" in d ? String(d.msg) : ""))
+      .filter(Boolean)
+      .join(", ") || message;
+  } else if (typeof body?.detail === "string") {
+    message = body.detail;
   }
   return new Error(message);
 }

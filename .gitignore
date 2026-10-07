@@ -1,33 +1,26 @@
-# Dependencies
 node_modules/
 __pycache__/
 *.pyc
 .venv/
 venv/
 
-# Next.js
 frontend/.next/
 frontend/out/
 frontend/.vercel
 
-# Environment
 .env*
 !.env.example
 .env
 .env.local
 .env*.local
 
-# Database
 *.db
 *.sqlite
 
-# OS
 .DS_Store
 Thumbs.db
 
-# IDE
 .vscode/
 .idea/
 
-# Logs
 *.log

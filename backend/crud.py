@@ -303,8 +303,6 @@ def delete_session(db, token):
         db.commit()
 
 
-# ---------- Export / Import ----------
-
 def zone_to_json(db: Session, zone: models.HostedZone) -> dict:
     records = db.query(models.Record).filter(models.Record.zone_id == zone.id).order_by(models.Record.id).all()
     return {
@@ -368,7 +366,6 @@ def parse_bind_zone(text: str, zone_name: str) -> tuple[list[dict], list[dict]]:
     buffer = ""
     paren_depth = 0
     for raw in text.splitlines():
-        # strip comments outside quotes
         in_quote = False
         out = []
         for ch in raw:
@@ -412,7 +409,6 @@ def parse_bind_zone(text: str, zone_name: str) -> tuple[list[dict], list[dict]]:
             last_name = name_token
         name_token = name_token or last_name or "@"
         ttl = int(ttl_token) if ttl_token else default_ttl
-        # Normalize name
         if name_token == "@":
             full_name = origin
         elif name_token.endswith("."):

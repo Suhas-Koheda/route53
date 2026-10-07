@@ -1,11 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export default function ClientOnly({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  // Hydration-restore pattern for client-only rendering; suppress the new set-state-in-effect rule.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   if (!mounted) return null;
   return <>{children}</>;
 }

@@ -51,15 +51,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [searchValue, setSearchValue] = useState("");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const searchRef = useRef<InputProps.Ref>(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("colorMode") === Mode.Dark
+  );
 
   useEffect(() => {
-    const enabled = localStorage.getItem("colorMode") === Mode.Dark;
-    // Restore the saved appearance after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDarkMode(enabled);
-    applyMode(enabled ? Mode.Dark : Mode.Light);
-  }, []);
+    applyMode(darkMode ? Mode.Dark : Mode.Light);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     const next = darkMode ? Mode.Light : Mode.Dark;

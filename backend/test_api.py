@@ -193,7 +193,6 @@ def test_ns_soa_protection():
     assert r.status_code == 400 and "apex" in r.json()["detail"].lower()
     r = client.put(f"/records/{soa['id']}", json={"value": "x"}, headers=headers(token))
     assert r.status_code == 400
-    # creating another SOA must be blocked
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "protected.com", "type": "SOA", "value": "ns1 x 1 1 1 1 1"}, headers=headers(token))
     assert r.status_code == 400
 
@@ -201,19 +200,16 @@ def test_ns_soa_protection():
 def test_routing_rules():
     token = signup("rr@test.com").json()["token"]
     zid = client.post("/hosted-zones", json={"name": "rr.com"}, headers=headers(token)).json()["id"]
-    # Weighted needs weight 0-255 + set_identifier
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "w.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Weighted", "weight": 300}, headers=headers(token))
     assert r.status_code == 422
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "w.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Weighted", "weight": 50}, headers=headers(token))
-    assert r.status_code == 422  # missing set_identifier
+    assert r.status_code == 422
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "w.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Weighted", "weight": 50, "set_identifier": "w1"}, headers=headers(token))
     assert r.status_code == 200
-    # Latency needs region
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "l.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Latency", "set_identifier": "l1"}, headers=headers(token))
     assert r.status_code == 422
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "l.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Latency", "set_identifier": "l1", "region": "us-east-1"}, headers=headers(token))
     assert r.status_code == 200
-    # Failover needs PRIMARY/SECONDARY
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "f.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Failover", "set_identifier": "f1", "failover_type": "BAD"}, headers=headers(token))
     assert r.status_code == 422
     r = client.post(f"/hosted-zones/{zid}/records", json={"name": "f.rr.com", "type": "A", "value": "1.2.3.4", "routing_policy": "Failover", "set_identifier": "f1", "failover_type": "PRIMARY"}, headers=headers(token))
@@ -288,12 +284,10 @@ def test_export_import_roundtrip():
     bind = r.text
     assert "$ORIGIN ei.com." in bind
     assert "www 300 IN A 1.2.3.4" in bind or "www.ei.com. 300 IN A 1.2.3.4" in bind
-    # import into a new zone
     zid2 = client.post("/hosted-zones", json={"name": "ei2.com"}, headers=headers(token)).json()["id"]
     r = client.post(f"/hosted-zones/{zid2}/import", files={"file": ("ei.com.zone", bind, "text/plain")}, headers=headers(token))
     assert r.status_code == 200
     body = r.json()
-    # apex NS/SOA should be skipped (managed automatically); www A and mail MX imported
     assert body["imported"] >= 2
     recs = client.get(f"/hosted-zones/{zid2}/records", headers=headers(token)).json()
     names = {(r["name"], r["type"]) for r in recs}

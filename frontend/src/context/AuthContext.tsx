@@ -23,19 +23,19 @@ function sessionCookie(token: string, maxAge: number) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<string | null>(null);
+  const [user, setUser] = useState<string | null>(() =>
+    typeof window !== "undefined" && localStorage.getItem("token")
+      ? localStorage.getItem("user")
+      : null
+  );
   const router = useRouter();
 
   useEffect(() => {
-    const saved = localStorage.getItem("user");
     const tok = localStorage.getItem("token");
-    if (saved && tok) {
-      // Hydration-restore from localStorage; suppress the new set-state-in-effect rule.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(saved);
+    if (user && tok) {
       sessionCookie(tok, 604800);
     }
-  }, []);
+  }, [user]);
 
   const persist = (email: string, token: string) => {
     localStorage.setItem("user", email);
@@ -57,11 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
-    } catch {
-      /* ignore */
-    }
+    await fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }).catch(() => undefined);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     document.cookie = "session=; path=/; max-age=0";
