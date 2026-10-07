@@ -106,8 +106,8 @@ export default function HostedZonesPage() {
             header: "Actions",
             cell: (item: any) => (
               <SpaceBetween direction="horizontal" size="xs">
-                <Link onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
-                <Link onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
+                <Link key="edit" onFollow={(e) => { e.preventDefault(); openEdit(item); }}>Edit</Link>
+                <Link key="delete" onFollow={(e) => { e.preventDefault(); setDeleteId(item.id); }}>Delete</Link>
               </SpaceBetween>
             ),
           },
@@ -138,8 +138,8 @@ export default function HostedZonesPage() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleSave}>{editing ? "Save" : "Create"}</Button>
+              <Button key="cancel" variant="link" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button key="save" variant="primary" onClick={handleSave}>{editing ? "Save" : "Create"}</Button>
             </SpaceBetween>
           </Box>
         }
@@ -172,8 +172,8 @@ export default function HostedZonesPage() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setDeleteId(null)}>Cancel</Button>
-              <Button variant="primary" onClick={handleDelete}>Delete</Button>
+              <Button key="cancel" variant="link" onClick={() => setDeleteId(null)}>Cancel</Button>
+              <Button key="delete" variant="primary" onClick={handleDelete}>Delete</Button>
             </SpaceBetween>
           </Box>
         }
