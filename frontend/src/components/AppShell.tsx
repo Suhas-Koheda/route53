@@ -65,7 +65,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span>
             Route 53 /{" "}
             {pathname.startsWith("/hosted-zones/")
-              ? "Hosted zones / " + (pathname.split("/")[2] || "")
+              ? "Hosted zones / Details"
               : pathname.split("/")[1] || "Hosted zones"}
           </span>
         }
