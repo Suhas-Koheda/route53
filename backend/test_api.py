@@ -30,10 +30,10 @@ def clean():
     db.commit()
     db.close()
 
-def signup(email, pw="password123"):
+def signup(email, pw="Password123!"):
     return client.post("/auth/signup", json={"email": email, "password": pw})
 
-def login(email, pw="password123"):
+def login(email, pw="Password123!"):
     return client.post("/auth/login", json={"email": email, "password": pw})
 
 def headers(token):
@@ -52,7 +52,7 @@ def test_invalid_token_401():
 
 def test_invalid_login_401():
     signup("b@test.com")
-    r = login("b@test.com", "wrongpass")
+    r = login("b@test.com", "Wrongpass1!")
     assert r.status_code == 401
 
 def test_zone_crud():

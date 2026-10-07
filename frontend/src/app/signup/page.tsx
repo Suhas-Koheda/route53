@@ -13,6 +13,10 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~';]/.test(password)) {
+      setError("Password must be at least 8 characters and include lowercase, uppercase, a number, and a special character.");
+      return;
+    }
     try {
       const res = await signup(email, password);
       localStorage.setItem("user", res.email);
@@ -51,6 +55,9 @@ export default function SignupPage() {
               style={{ width: "100%", padding: "10px 12px", border: "1px solid #aab7b8", borderRadius: 4, fontSize: 14, boxSizing: "border-box" }}
               required
             />
+            <p style={{ fontSize: 12, color: "#687078", marginTop: 6 }}>
+              Min 8 chars, at least one lowercase, uppercase, number, and special character (e.g. P@ssw0rd!).
+            </p>
             {error && (
               <div style={{ backgroundColor: "#fde9e9", border: "1px solid #d32f2f", color: "#b71c1c", padding: "10px 12px", borderRadius: 4, fontSize: 13, marginTop: 16 }}>
                 {error}
