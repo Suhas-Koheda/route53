@@ -159,6 +159,12 @@ export default function ZoneDetailPage({ params }: { params: Promise<{ id: strin
     setShowModal(true);
   };
 
+  useEffect(() => {
+    const onCreateRecord = () => openCreate();
+    window.addEventListener("route53:create-record", onCreateRecord);
+    return () => window.removeEventListener("route53:create-record", onCreateRecord);
+  }, []);
+
   const openEdit = () => {
     if (selected.length !== 1) return;
     const r = selected[0];
